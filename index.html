@@ -609,7 +609,7 @@ const defDate=()=>UI.month===NOW_M?TODAY_S:UI.month+'-01';
    amount = valor de cada cuota (con el interés incluido) e int = % de interés total. No se descuenta del disponible.
    Lo que se descuenta es el pago: un gasto variable con cat:'tarjeta', card y cardM (el mes del resumen que paga).
    Lo que no se paga de un resumen pasa al siguiente como saldo anterior. */
-const CUOTAS=[1,3,6,12,24,36];
+const CUOTAS=[1,3,6,12,18,24];
 const NETS={visa:'Visa',mastercard:'Mastercard',otra:'Otra'};
 const CTYPES={credito:'Crédito',debito:'Débito',prepaga:'Prepaga'};
 const cards=()=>(S.settings.cards||[]).slice().sort((a,b)=>(a.created||0)-(b.created||0));
@@ -617,7 +617,8 @@ const cardById=id=>(S.settings.cards||[]).find(c=>c.id===id)||null;
 const cardName=c=>c?(c.name||((c.net&&c.net!=='otra'?NETS[c.net]+' ':'')+(CTYPES[c.type]||'').toLowerCase()).trim()||'Tarjeta'):'Tarjeta sin datos';
 const cardSub=c=>[c.net&&c.net!=='otra'?NETS[c.net]:'',CTYPES[c.type]||'',c.num?'•••• '+c.num:''].filter(Boolean).join(' · ');
 const isCardPayMov=m=>!!(m.card&&m.cardM&&m.kind!=='cuota');
-function cuotaIdx(m,M){if(!m.rec)return m.idx||1;const[y1,m1]=m.month.split('-').map(Number),[y2,m2]=M.split('-').map(Number);return (y2-y1)*12+(m2-m1)+1}
+// i0: en qué cuota iba la compra cuando se cargó (por defecto 1); month es el mes de esa cuota
+function cuotaIdx(m,M){if(!m.rec)return m.idx||1;const[y1,m1]=m.month.split('-').map(Number),[y2,m2]=M.split('-').map(Number);return (y2-y1)*12+(m2-m1)+(m.i0||1)}
 function cardMovs(){const out=[];for(const a of accs())for(const m of Object.values(a.movs))if(m.card&&(m.kind==='cuota'||m.cardM))out.push({...m,acc:a});return out}
 function cardDue(c,M){if(c.dues&&c.dues[M])return c.dues[M];return c.dueDay?M+'-'+pad(Math.min(+c.dueDay,daysIn(M))):null}
 // mes de la primera cuota: si la tarjeta tiene día de cierre y compraste después del cierre, va al resumen siguiente
@@ -1278,7 +1279,7 @@ function openMovSheet(mov,preset={}){
   const st={kind:m.kind,cat:m.cat||(m.kind==='ingreso'?'sueldo':''),sign:preset.sign||(m.kind==='ahorro'&&m.amount<0?-1:1),goal:m.goal||'',acc:mov?mov.acc.id:defAcc};
   const base=cur();const o0=mov?origOf(mov,base):{cur:base,amount:0};
   // cuotas: el monto que se escribe es el precio sin interés; se guarda el valor de cada cuota
-  st.cuo=isCuo||!!preset.cuotas;st.card=isCuo?mov.card:(preset.card||(cards().length===1?cards()[0].id:''));st.n=isCuo&&mov.rec?(mov.n||1):1;st.int=isCuo&&+mov.int>0?+mov.int:0;st.intOn=st.int>0;st.first=isCuo?mov.month:null;
+  st.cuo=isCuo||!!preset.cuotas;st.card=isCuo?mov.card:(preset.card||(cards().length===1?cards()[0].id:''));st.n=isCuo&&mov.rec?(mov.n||1):1;st.int=isCuo&&+mov.int>0?+mov.int:0;st.intOn=st.int>0;st.first=isCuo?mov.month:null;st.i0=isCuo&&mov.rec?(mov.i0||1):1;st.nOther=!CUOTAS.includes(st.n);
   if(isCuo){o0.amount=round2(o0.amount*(mov.rec?(mov.n||1):1)/(1+st.int/100))}
   if(!mov&&preset.amount)o0.amount=preset.amount;
   if(!mov&&preset.date)m.date=preset.date;
@@ -1318,8 +1319,12 @@ function openMovSheet(mov,preset={}){
   extra();
   const cuoOn=()=>st.cuo&&st.kind==='variable';
   const cuoHint=()=>{const el=$('#f-cuo-hint');if(!el)return;const a=parseAmount($('#f-amount').value);const r=st.cur===base?1:parseAmount($('#f-rate').value);
-    if(!(a>0)){el.textContent=`Escribí arriba el precio${st.intOn?' sin interés':''} y te lo divido en ${st.n} ${st.n===1?'pago':'cuotas'}.`;return}
-    const tot=a*(r>0?r:1)*(1+(st.intOn?st.int:0)/100);el.innerHTML=st.n===1?`1 pago de <b>${money(tot)}</b>`:`${st.n} cuotas de <b>${money(tot/st.n)}</b> · Total <b>${money(tot)}</b>${st.intOn&&st.int?` (${money(tot-a*(r>0?r:1))} de interés)`:''}`};
+    if(!(a>0)){el.textContent=`Escribí arriba el precio total${st.intOn?' sin interés':''} y te lo divido en ${st.n} ${st.n===1?'pago':'cuotas'}.`;return}
+    const tot=a*(r>0?r:1)*(1+(st.intOn?st.int:0)/100),per=tot/st.n,left=st.n-st.i0+1;
+    el.innerHTML=st.n===1?`1 pago de <b>${money(tot)}</b>`:`${st.n} cuotas de <b>${money(per)}</b> · Total <b>${money(tot)}</b>${st.intOn&&st.int?` (${money(tot-a*(r>0?r:1))} de interés)`:''}${st.i0>1?`<br>Vas por la cuota ${st.i0}: se cargan ${left===1?'la última':'las '+left+' que quedan'} (<b>${money(per*left)}</b>). Las anteriores se toman como ya pagadas.`:''}`};
+  const i0Opts=()=>{const sel=$('#f-i0');if(!sel)return;if(st.i0>st.n)st.i0=1;$('#row-i0').hidden=st.n<2;
+    sel.innerHTML=[...Array(Math.max(st.n,1))].map((_,i)=>`<option value="${i+1}" ${i+1===st.i0?'selected':''}>${i+1} de ${st.n}</option>`).join('');
+    const l=$('#f-first-l');if(l)l.textContent=st.i0>1?`La cuota ${st.i0} va en`:'Primera cuota'};
   const firstOpts=()=>{const sel=$('#f-first');if(!sel)return;const d=$('#f-date').value||defDate();const c=cardById(st.card);const def=firstCuotaM(c,d);const M0=d.slice(0,7);
     const opts=[M0,addM(M0,1),addM(M0,2)];if(st.first&&!opts.includes(st.first))opts.push(st.first);const want=st.firstManual&&opts.includes(st.first)?st.first:(isCuo&&st.first?st.first:def);
     sel.innerHTML=opts.map(X=>`<option value="${X}" ${X===want?'selected':''}>${mLabel(X)}</option>`).join('')};
@@ -1332,17 +1337,20 @@ function openMovSheet(mov,preset={}){
     if(!cs.some(c=>c.id===st.card)&&!(isCuo&&st.card===mov.card))st.card='';
     box.innerHTML=`<div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
       <div><div class="g-label">Tarjeta</div><div class="chips" data-chips="card">${cs.map(c=>`<button type="button" class="chip" data-v="${c.id}" aria-pressed="${c.id===st.card}"><span class="ci" style="background:${col(c.color||'indigo')}">${icon('card')}</span>${esc(cardName(c))}${c.num?' <span class="muted small">'+esc(c.num)+'</span>':''}</button>`).join('')}</div></div>
-      <div><div class="g-label">Cuotas</div><div class="seg" id="f-n">${CUOTAS.map(n=>`<button type="button" data-k="${n}" aria-pressed="${n===st.n}">${n}</button>`).join('')}</div></div>
+      <div><div class="g-label">Cuotas</div><div class="seg" id="f-n">${CUOTAS.map(n=>`<button type="button" data-k="${n}" aria-pressed="${n===st.n&&!st.nOther}">${n}</button>`).join('')}<button type="button" data-k="otra" aria-pressed="${!!st.nOther}">Otra</button></div></div>
       <div class="seg" id="f-int"><button type="button" data-k="0" aria-pressed="${!st.intOn}">Sin interés</button><button type="button" data-k="1" aria-pressed="${st.intOn}">Con interés</button></div>
       <div class="group">
         <label class="row" id="row-int" ${st.intOn?'':'hidden'}><span>Interés total (%)</span><input id="f-intp" inputmode="decimal" placeholder="Ej: 25" autocomplete="off" value="${st.int?plainNum(st.int):''}"></label>
-        <label class="row"><span>Primera cuota</span><select id="f-first"></select></label>
+        <label class="row" id="row-nc" ${st.nOther?'':'hidden'}><span>Cantidad de cuotas</span><input id="f-nc" inputmode="numeric" placeholder="Ej: 9" autocomplete="off" maxlength="2" value="${st.nOther?st.n:''}"></label>
+        <label class="row" id="row-i0"><span>Vas por la cuota</span><select id="f-i0"></select></label>
+        <label class="row"><span id="f-first-l">Primera cuota</span><select id="f-first"></select></label>
       </div>
       <div class="hint" id="f-cuo-hint" style="padding-top:0"></div>
       <div class="hint" style="padding-top:0">No se descuenta de tu plata ahora: cada cuota se suma al resumen de la tarjeta y se descuenta cuando la pagás en Tarjetas.</div></div>`;
-    if(!CUOTAS.includes(st.n)){const b=document.createElement('button');b.type='button';b.dataset.k=st.n;b.textContent=st.n;b.setAttribute('aria-pressed','true');$('#f-n').appendChild(b)}
     bindChips(box,'card',v=>{st.card=v;if(!isCuo)st.firstManual=false;firstOpts()});
-    bindSeg($('#f-n'),k=>{st.n=+k;cuoHint()});
+    bindSeg($('#f-n'),k=>{st.nOther=k==='otra';$('#row-nc').hidden=!st.nOther;if(st.nOther){const v=parseInt($('#f-nc').value);if(v>0)st.n=v;setTimeout(()=>$('#f-nc').focus(),50)}else st.n=+k;i0Opts();cuoHint()});
+    $('#f-nc').addEventListener('input',()=>{const v=parseInt($('#f-nc').value.replace(/\D/g,''));if(v>0&&v<=72){st.n=v;i0Opts();cuoHint()}});
+    $('#f-i0').onchange=()=>{st.i0=+$('#f-i0').value;i0Opts();cuoHint()};i0Opts();
     bindSeg($('#f-int'),k=>{st.intOn=k==='1';$('#row-int').hidden=!st.intOn;if(st.intOn)setTimeout(()=>$('#f-intp').focus(),50);cuoHint()});
     $('#f-intp').addEventListener('input',()=>{st.int=parseAmount($('#f-intp').value)||0;cuoHint()});
     $('#f-first').onchange=()=>{st.first=$('#f-first').value;st.firstManual=true};
@@ -1388,9 +1396,10 @@ function openMovSheet(mov,preset={}){
     if(cuoOn()){
       if(!st.card){shake($('#f-cuo-box'));toast(cards().length?'Elegí la tarjeta':'Primero agregá una tarjeta');return false}
       const ip=st.intOn?st.int:0;if(st.intOn&&!(ip>0)){shake($('#row-int'));toast('Poné cuánto interés tiene (en %)');return false}
-      const n=st.n,k=1+ip/100,first=$('#f-first').value||firstCuotaM(cardById(st.card),date);
+      if(st.nOther){const v=parseInt($('#f-nc').value);if(!(v>=1&&v<=72)){shake($('#row-nc'));toast('Poné cuántas cuotas son (de 1 a 72)');return false}st.n=v}
+      const n=st.n,i0=Math.min(st.i0||1,n),k=1+ip/100,first=$('#f-first').value||firstCuotaM(cardById(st.card),date);
       if(fx)fx={...fx,amount:round2(fx.amount*k/n)};
-      const cb={kind:'cuota',amount:round2(amtB*k/n),cur:base,fx,notif:null,desc:$('#f-desc').value.trim()||ci.name,cat,catName:ci.name,date,due:null,month:first,rec:true,end:addM(first,n-1),n,int:ip,card:st.card,goal:null,skip:isCuo&&old0()?.month===first?(old0().skip||[]):[],paid:[],by:mov?.by||ME.uid||null,created:mov?.created||Date.now()};
+      const cb={kind:'cuota',amount:round2(amtB*k/n),cur:base,fx,notif:null,desc:$('#f-desc').value.trim()||ci.name,cat,catName:ci.name,date,due:null,month:first,rec:true,end:addM(first,n-i0),n,i0,int:ip,card:st.card,goal:null,skip:isCuo&&old0()?.month===first?(old0().skip||[]):[],paid:[],by:mov?.by||ME.uid||null,created:mov?.created||Date.now()};
       if(isCuo&&!mov.rec&&n===1)Object.assign(cb,{rec:false,end:null,n:mov.n||1,idx:mov.idx||1});
       return write(async()=>{
         if(isEdit&&a.id===mov.acc.id)await B.putMov(a,{...cb,id:mov.id});
