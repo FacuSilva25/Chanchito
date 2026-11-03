@@ -1,0 +1,3 @@
+Regenerar chanchito-pwa/index.html a partir de cuentas-claras/cuentas-claras.html (si se cambia la versión de claude.ai):
+  python3 port.py ../cuentas-claras/cuentas-claras.html ../chanchito-pwa/index.html pwa-block.js
+Después subir VERSION en chanchito-pwa/sw.js.
