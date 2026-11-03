@@ -355,6 +355,10 @@ body.auth-mode .app{grid-template-columns:1fr}
 .cal-g button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
 .cal-f{display:flex;justify-content:space-between;gap:8px;padding-top:8px}
 .acc-chips{padding:10px 14px}
+.hero-vrow{display:flex;align-items:center;gap:12px}
+.eye-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--fill);color:var(--label-2);flex:none}
+.eye-btn:hover{color:var(--accent)}
+.eye-btn svg.i{width:22px;height:22px}
 .cd-h{display:flex;align-items:center;gap:12px;padding:0 4px 10px}
 .stepper{display:inline-flex;align-items:center;gap:10px;margin-left:auto}
 .stepper b{min-width:64px;text-align:center;font-weight:600}
@@ -429,6 +433,8 @@ const ICONS={
   bell:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   download:'<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.5"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff:'<path d="M4 4l16 16M10.6 6.2A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.6M6.6 7.6C4 9.3 2.5 12 2.5 12S6 18 12 18c1.6 0 3-.4 4.2-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   card:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>',
   globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z"/>',
@@ -565,7 +571,7 @@ function catInfo(id,name){return expCats().concat(catsFor('inc'),S.settings.cats
 const S={accounts:{},settings:{},ready:false};
 const ME={uid:null,mode:'boot',readOnly:false,backend:null};
 const needLogin=()=>ME.backend==='claude'?'abrí la app con tu sesión de Claude':'iniciá sesión desde Configuración';
-const UI={metView:'informe',tab:'resumen',month:NOW_M,acc:store('cc-acc')||'all',movFilter:'todos',q:''};
+const UI={hide:store('cc-hide')===true,metView:'informe',tab:'resumen',month:NOW_M,acc:store('cc-acc')||'all',movFilter:'todos',q:''};
 const accs=()=>Object.values(S.accounts).sort((a,b)=>(a.scope===b.scope?0:a.scope==='p'?-1:1)||(a.created||0)-(b.created||0));
 const selAccs=()=>UI.acc==='all'?accs():accs().filter(a=>a.id===UI.acc);
 function occurs(m,M){if(!m.rec)return m.month===M;return m.month<=M&&(!m.end||M<=m.end)&&!(m.skip||[]).includes(M)}
@@ -845,7 +851,7 @@ function viewResumen(){
   return `${repCard}${up.length?`<section class="card alert-card"><div class="card-head"><h2 style="display:flex;align-items:center;gap:8px"><span style="color:var(--c-orange);display:flex">${icon('bell')}</span>Próximos vencimientos</h2><button class="link" data-act="notifs">Configurar</button></div><div class="list">${up.slice(0,5).map(dueRow).join('')}</div>${up.length>5?`<button class="link small" data-act="notifs">Ver los ${up.length}</button>`:''}</section>`:''}
   <section class="hero" aria-label="Disponible">
     <div><div class="tile-l">${over?'Te pasaste este mes':'Disponible para gastar'}</div>
-    <div class="hero-v num" style="${over?'color:var(--neg)':''}">${money(t.disp)}</div></div>
+    <div class="hero-vrow"><div class="hero-v num" style="${over&&!UI.hide?'color:var(--neg)':''}">${UI.hide?'$ ••••••':money(t.disp)}</div><button class="eye-btn" data-act="toggleHide" aria-pressed="${!!UI.hide}" aria-label="${UI.hide?'Mostrar montos':'Ocultar montos'}">${icon(UI.hide?'eyeoff':'eye')}</button></div></div>
     ${hasIncome?`<div class="bar" role="img" aria-label="Distribución del ingreso">${seg(t.fijo,'indigo')}${seg(t.variable,'orange')}${seg(Math.max(t.ahorro,0),'teal')}${seg(Math.max(t.disp,0),'green')}</div>
     <div class="legend"><span><i style="background:${col('indigo')}"></i>Fijos <b>${pct(t.fijo/t.ingreso)}</b></span><span><i style="background:${col('orange')}"></i>Variables <b>${pct(t.variable/t.ingreso)}</b></span><span><i style="background:${col('teal')}"></i>Ahorro <b>${pct(t.ahorro/t.ingreso)}</b></span><span><i style="background:${col('green')}"></i>Libre <b>${pct(Math.max(t.disp,0)/t.ingreso)}</b></span></div>`
     :`<div class="banner" style="background:var(--fill)">${icon('briefcase')}<div>Todavía no cargaste ingresos en ${mLabel(UI.month,'month').toLowerCase()}. <button class="link small strong" data-act="newIncome">Cargar sueldo</button></div></div>`}
@@ -877,7 +883,7 @@ function viewResumen(){
       :`<p class="muted" style="margin:0">Poné un objetivo (un viaje, un fondo de emergencia) y andá llenándolo.</p><div style="margin-top:12px"><button class="btn secondary sm" data-act="newGoal">${icon('plus')}Nueva meta</button></div>`}
     </section>
   </div>`}
-function tile(l,v,c,ic,kind){return `<button class="tile" data-act="filterTo" data-kind="${kind}"><span class="ic" style="background:${col(c)}">${icon(ic)}</span><span class="tile-l">${l}</span><span class="tile-v num">${money(v)}</span></button>`}
+function tile(l,v,c,ic,kind){return `<button class="tile" data-act="filterTo" data-kind="${kind}"><span class="ic" style="background:${col(c)}">${icon(ic)}</span><span class="tile-l">${l}</span><span class="tile-v num">${UI.hide?'$ ••••':money(v)}</span></button>`}
 function catTotals(list){const m={};list.filter(o=>(o.kind==='fijo'||o.kind==='variable')&&counted(o)).forEach(o=>{const ci=catInfo(o.cat,o.catName);const k=ci.id;m[k]=m[k]||{...ci,v:0};m[k].v+=+o.amount||0});return Object.values(m).sort((a,b)=>b.v-a.v)}
 
 function cuotaBuys(M){const out=[];for(const a of selAccs())for(const m of Object.values(a.movs))if(m.kind==='cuota'&&(m.date||'').slice(0,7)===M){const per=amtIn(m,m.month);out.push({...m,acc:a,per,amount:round2(per*(m.rec?(m.n||1):1)),day:+m.date.slice(8,10)||1,M})}return out}
@@ -1662,6 +1668,7 @@ const ACT={
   newCard:()=>openCardSheet(null),
   editCard:d=>{const c=cardById(d.id);c?openCardSheet(c):openCardSheet(null,{id:d.id})},
   cardDue:d=>openCardDueSheet(d.id),
+  toggleHide:()=>{UI.hide=!UI.hide;store('cc-hide',UI.hide);render()},
   cuotaInfo:d=>openCuotaInfo(d.acc,d.id,d.m||UI.month),
   cardsDetail:d=>openCardsDetail(d.id||null),
   payCard:d=>openPayCard(d.id,d.m||UI.month),
