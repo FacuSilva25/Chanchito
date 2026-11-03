@@ -1000,6 +1000,10 @@ function openCardsDetail(only){
   openSheet({title:only?'Detalle de '+cardName(cardById(only)):'Detalle de tarjetas',saveLabel:'Listo',onSave:()=>true,
     body:`${!only&&ids.length>1?`<div class="group"><div class="row"><span>Te queda pagar en todas las tarjetas</span><b class="num">${money(grand)}</b></div></div>`:''}${sec}<div class="hint" style="padding-top:0">Desde ${mLabel(M).toLowerCase()}. Tocá una compra para ver todo su detalle.</div>`});
 }
+// borra una sola cuota (la del mes M) de una compra; si era la única, borra la compra
+async function delOneCuota(a,m,M){const left=[];if(m.rec){let X=m.month;for(let k=0;k<600&&X<=(m.end||X);k++,X=addM(X,1))if(X!==M&&!(m.skip||[]).includes(X))left.push(X)}
+  const fn=!m.rec||!left.length?()=>B.delMov(a,m.id):()=>B.putMov(a,{...m,skip:[...(m.skip||[]),M]});
+  return write(fn,!m.rec||!left.length?'Compra eliminada':'Cuota de '+mLabel(M,'month').toLowerCase()+' eliminada')}
 function openCuotaInfo(accId,id,M){
   const a=S.accounts[accId];const m=a?.movs[id];if(!m)return;const c=cardById(m.card);const ci=catInfo(m.cat,m.catName);
   const n=m.n||1,i=cuotaIdx(m,M),per=amtIn(m,M),left=Math.max(n-i,0);
@@ -1011,8 +1015,10 @@ function openCuotaInfo(accId,id,M){
     <div class="group">${r('Tarjeta',esc(cardName(c))+(c&&c.num?' •••• '+esc(c.num):''))}${r('Cuota de '+mLabel(M,'month').toLowerCase(),`<b style="color:var(--label)">${n>1?i+' de '+n:'1 pago'}</b>`)}${r('Valor de la cuota',money(per))}</div>
     ${n>1?`<div class="group">${r('Te quedan',left?`${left} ${left===1?'cuota':'cuotas'} después de esta`:'Es la última')}${left?r('Lo que queda por pagar',`<b style="color:var(--label)">${money(per*left)}</b>`):''}${r('Con esta incluida',money(per*(left+1)))}${r('Última cuota',mLabel(lastM))}</div>`:''}
     <div class="group">${r('Total de la compra',money(tot))}${r('Interés',+m.int?plainNum(+m.int)+'% ('+money(tot-base)+')':'Sin interés')}${r('Fecha de compra',fmtDMY(m.date))}${n>1?r('Primera cuota',mLabel(firstM)):''}</div>`;
-  openSheet({title:'Detalle de la cuota',body,saveLabel:'Listo',onSave:()=>true,foot:`<button class="btn secondary" id="ci-edit">${icon('pencil')}Editar compra</button>`});
-  $('#ci-edit').onclick=()=>{closeSheet();setTimeout(()=>{const f=findMov(accId,id);if(f)openMovSheet(f)},320)};
+  openSheet({title:'Detalle de la cuota',body,saveLabel:'Listo',onSave:()=>true,foot:`<button class="btn secondary" id="ci-edit">${icon('pencil')}Editar compra</button><button class="btn danger" id="ci-del1">Borrar la cuota de ${mLabel(M,'month').toLowerCase()}</button><button class="btn danger" id="ci-delall">Borrar la compra entera</button>`});
+  $('#ci-edit').onclick=()=>{closeSheet();setTimeout(()=>{const f=findMov(accId,id);if(f)openMovSheet({...f,cuoM:M})},320)};
+  $('#ci-del1').onclick=e=>confirmBtn(e.currentTarget,async()=>{if(await delOneCuota(a,m,M))closeSheet()});
+  $('#ci-delall').onclick=e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>B.delMov(a,m.id),'Compra eliminada'))closeSheet()});
 }
 function openCardDueSheet(id){
   const c=cardById(id);if(!c)return;const M=UI.month;const cur0=cardDue(c,M)||M+'-10';
@@ -1352,7 +1358,8 @@ function openMovSheet(mov,preset={}){
     </div>${recHint}</div>`;
   let foot='';
   if(isEdit){foot=mov.rec&&!isCuo?`<button class="btn danger" id="del-one">Quitar solo de ${mLabel(UI.month,'month').toLowerCase()}</button><button class="btn danger" id="del-from">Terminar desde ${mLabel(UI.month,'month').toLowerCase()}</button>`:`<button class="btn danger" id="del-all">Eliminar movimiento</button>`}
-  if(isCuo)foot=`<button class="btn danger" id="del-all">Eliminar compra en cuotas</button>`;
+  const cuoM=isCuo?(mov.cuoM||(occurs(mov,UI.month)?UI.month:null)):null;
+  if(isCuo)foot=`${cuoM?`<button class="btn danger" id="del-cuo">Borrar la cuota de ${mLabel(cuoM,'month').toLowerCase()}</button>`:''}<button class="btn danger" id="del-all">Borrar la compra entera</button>`;
   openSheet({title:isEdit?(isCuo?'Editar compra en cuotas':'Editar movimiento'):(st.cuo?'Compra en cuotas':'Nuevo movimiento'),body,foot,onSave:save});
   const root=$('#sheet-root');
   const extra=()=>{const ex=$('#f-extra');
@@ -1466,6 +1473,7 @@ function openMovSheet(mov,preset={}){
         else await B.putMov(a,{...body,...keep,id:mov.id});
       }},isEdit?'Cambios guardados':st.kind==='ingreso'?'Ingreso cargado':st.kind==='ahorro'?(st.sign<0?'Retiro registrado':'¡Bien ahí! Ahorro guardado'):'Gasto cargado')}
   if(isEdit){const a=mov.acc;const old=a.movs[mov.id];
+    root.querySelector('#del-cuo')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await delOneCuota(a,old,cuoM))closeSheet()}));
     root.querySelector('#del-all')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>B.delMov(a,mov.id),'Movimiento eliminado'))closeSheet()}));
     root.querySelector('#del-one')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>B.putMov(a,{...old,skip:[...(old.skip||[]),UI.month]}),'Quitado de este mes'))closeSheet()}));
     root.querySelector('#del-from')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{const fn=UI.month<=old.month?()=>B.delMov(a,mov.id):()=>B.putMov(a,{...old,end:addM(UI.month,-1)});if(await write(fn,'Listo, ya no se repite'))closeSheet()}));
