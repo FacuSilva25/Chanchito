@@ -336,6 +336,25 @@ body.auth-mode .app{grid-template-columns:1fr}
 .tj-lines>*{display:flex;justify-content:space-between;gap:10px;padding:7px 0;width:100%;text-align:left}
 .tj-lines>*+*{border-top:1px solid var(--sep)}
 .tj .li{min-height:48px}
+.tj .li-main{align-items:flex-start;text-align:left}
+.li-s.li-wrap{white-space:normal;flex-wrap:wrap;gap:2px 8px;margin-top:2px;justify-content:flex-start}.li-s.li-wrap b{color:var(--label);font-weight:600}
+/* Selector de fecha propio (dd/mm/aaaa) */
+.date-btn{display:inline-flex;align-items:center;gap:6px;color:var(--label-2);font-size:16px;padding:10px 0;margin-left:auto;font-variant-numeric:tabular-nums}
+.date-btn svg.i{width:17px;height:17px;color:var(--accent)}
+.date-btn[aria-expanded="true"]{color:var(--accent)}
+.cal{padding:8px 12px 12px;border-top:1px solid var(--sep)}
+.cal-h{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 8px}
+.cal-h b{font-size:16px}
+.cal-h button{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--accent)}
+.cal-h button:hover{background:var(--fill)}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.cal-g .wd{font-size:11.5px;font-weight:600;color:var(--label-3);padding:4px 0;text-transform:uppercase}
+.cal-g button{height:38px;border-radius:50%;font-size:15px;font-variant-numeric:tabular-nums;max-width:40px;width:100%;justify-self:center}
+.cal-g button:hover{background:var(--fill)}
+.cal-g button.today{color:var(--accent);font-weight:700}
+.cal-g button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
+.cal-f{display:flex;justify-content:space-between;gap:8px;padding-top:8px}
+.acc-chips{padding:10px 14px}
 @media (max-width:420px){.tab{min-width:0;padding:6px 5px;font-size:10px}.tabbar-in{gap:0}}
 </style>
 </head>
@@ -407,6 +426,7 @@ const ICONS={
   bell:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   download:'<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 15.5V19a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3.5"/>',
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   card:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>',
   globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z"/>',
 };
@@ -894,7 +914,8 @@ function viewTarjetas(){
       dueTxt=s.rest>0.009&&diff<=7&&diff>=-30?dueTag({M,day:dd,diff}):`Vence el ${fmtDay(due)}`}
     const cuotaRow=o=>{const ci=catInfo(o.cat,o.catName);return `<button class="li" data-act="editMov" data-acc="${o.acc.id}" data-id="${o.id}">
       <span class="li-ic" style="background:${col(ci.color)};width:32px;height:32px">${icon(ci.icon)}</span>
-      <span class="li-main"><span class="li-t">${esc(o.desc)}</span><span class="li-s">${(o.n||1)>1?`Cuota ${o.i} de ${o.n}`:'1 pago'} · ${+o.int?plainNum(+o.int)+'% de interés':'Sin interés'}</span></span>
+      <span class="li-main"><span class="li-t">${esc(o.desc)}</span><span class="li-s li-wrap">${(()=>{const n=o.n||1,left=Math.max(n-o.i,0);
+        return n>1?`<span class="tag rec num">Cuota ${o.i}/${n}</span>${left?`<span>Quedan ${left} · <b class="num">${money(o.amount*left)}</b></span>`:'<span>Última cuota</span>'}`:'<span>1 pago</span>'})()}<span>${+o.int?plainNum(+o.int)+'% de interés':'Sin interés'}</span></span></span>
       <span class="li-amt">${money(o.amount)}</span></button>`};
     return `<section class="card tj">
       <div class="tj-head">${plastic(c)}<div style="min-width:0;flex:1"><h3 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cardName(c))}</h3><span class="muted small">${c?esc(cardSub(c)):'Tocá Editar para completar los datos'}</span></div><button class="link" data-act="editCard" data-id="${esc(id)}">Editar</button></div>
@@ -917,7 +938,7 @@ function viewTarjetas(){
 function openCardSheet(c,preset={}){
   const isEdit=!!c;const list=accs();
   const st={net:c?.net||'visa',type:c?.type||'credito',color:c?.color||'indigo'};
-  const days=(sel,none)=>`<option value="">${none}</option>`+[...Array(31)].map((_,i)=>`<option value="${i+1}" ${+sel===i+1?'selected':''}>${i+1}</option>`).join('');
+  const nextOn=day=>{if(!day)return '';let X=NOW_M;if(+day<TODAY.getDate())X=addM(X,1);return X+'-'+pad(Math.min(+day,daysIn(X)))};st.acc=c&&S.accounts[c.acc]?c.acc:list[0]?.id||null;
   const body=`
     <div style="display:flex;justify-content:center" id="cd-prev"></div>
     <div><div class="g-label">Tarjeta</div><div class="seg" id="cd-net">${Object.entries(NETS).map(([k,l])=>`<button type="button" data-k="${k}" aria-pressed="${k===st.net}">${l}</button>`).join('')}</div></div>
@@ -925,20 +946,20 @@ function openCardSheet(c,preset={}){
     <div><div class="group">
       <label class="row"><span>Nombre</span><input id="cd-name" value="${esc(c?.name||'')}" placeholder="Opcional, ej: Visa Galicia" maxlength="40"></label>
       <label class="row"><span>Últimos 4 números</span><input id="cd-num" inputmode="numeric" maxlength="4" value="${esc(c?.num||'')}" placeholder="Opcional" autocomplete="off"></label>
-      <label class="row"><span>Vence el día</span><select id="cd-due">${days(c?.dueDay,'Sin definir')}</select></label>
-      <label class="row"><span>Cierra el día</span><select id="cd-close">${days(c?.closeDay,'Sin definir')}</select></label>
-      ${list.length?`<label class="row"><span>La pagás desde</span><select id="cd-acc">${list.map(a=>`<option value="${a.id}" ${a.id===(c?.acc||list[0].id)?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`:''}
-    </div><div class="hint">Por seguridad solo guardo los últimos 4 números. El día de vencimiento es cuándo tenés que pagar el resumen cada mes (después lo podés cambiar para un mes puntual). Con el día de cierre, lo que comprás después del cierre va al resumen siguiente.</div></div>
+      <label class="row"><span>Próximo vencimiento</span>${dateField('cd-due',nextOn(c?.dueDay),{empty:'Sin definir',clear:true})}</label>
+      <label class="row"><span>Próximo cierre</span>${dateField('cd-close',nextOn(c?.closeDay),{empty:'Sin definir',clear:true})}</label>
+    </div><div class="hint">Por seguridad solo guardo los últimos 4 números. El vencimiento y el cierre se repiten el mismo día todos los meses (el vencimiento de un mes puntual lo podés cambiar después). Lo que comprás después del cierre va al resumen siguiente.</div></div>
+    ${list.length?`<div><div class="g-label">La pagás desde</div><div class="group">${accChips(st.acc,'cdacc')}</div></div>`:''}
     <div><div class="g-label">Color</div><div class="group"><div class="swatches" id="cd-color">${COLORS.map(k=>`<button type="button" class="sw" data-k="${k}" aria-pressed="${k===st.color}" aria-label="${k}" style="background:${col(k)}"></button>`).join('')}</div></div></div>`;
   const nCuo=isEdit?cardMovs().filter(m=>m.card===c.id).length:0;
   openSheet({title:isEdit?'Editar tarjeta':'Nueva tarjeta',body,foot:isEdit?`<button class="btn danger" id="cd-del">Eliminar tarjeta</button>`:'',onSave:save});
   const prev=()=>{$('#cd-prev').innerHTML=plastic({...st,num:$('#cd-num').value.replace(/\D/g,'')})};
-  bindSeg($('#cd-net'),k=>{st.net=k;prev()});bindSeg($('#cd-type'),k=>st.type=k);
+  bindSeg($('#cd-net'),k=>{st.net=k;prev()});bindChips($('#sheet-root'),'cdacc',v=>st.acc=v);bindSeg($('#cd-type'),k=>st.type=k);
   $('#cd-color').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;st.color=b.dataset.k;$('#cd-color').querySelectorAll('[data-k]').forEach(x=>x.setAttribute('aria-pressed',x===b));prev()});
   $('#cd-num').addEventListener('input',prev);prev();
   async function save(){
     const num=$('#cd-num').value.replace(/\D/g,'');if(num&&num.length!==4){shake($('#cd-num').closest('.row'));toast('Poné los últimos 4 números (o dejalo vacío)');return false}
-    const body={...(c||{}),id:c?.id||preset.id||newId(),name:$('#cd-name').value.trim(),num,net:st.net,type:st.type,color:st.color,dueDay:+$('#cd-due').value||null,closeDay:+$('#cd-close').value||null,acc:$('#cd-acc')?.value||null,created:c?.created||Date.now()};
+    const body={...(c||{}),id:c?.id||preset.id||newId(),name:$('#cd-name').value.trim(),num,net:st.net,type:st.type,color:st.color,dueDay:+$('#cd-due').value.slice(8,10)||null,closeDay:+$('#cd-close').value.slice(8,10)||null,acc:st.acc,created:c?.created||Date.now()};
     const rest=(S.settings.cards||[]).filter(x=>x.id!==body.id);
     const ok=await write(()=>B.saveSettings({...S.settings,cards:[...rest,body]}),isEdit?'Tarjeta actualizada':'Tarjeta agregada');
     if(ok&&preset.then)setTimeout(()=>preset.then(body),320);
@@ -948,13 +969,13 @@ function openCardSheet(c,preset={}){
 }
 function openCardDueSheet(id){
   const c=cardById(id);if(!c)return;const M=UI.month;const cur0=cardDue(c,M)||M+'-10';
-  openSheet({title:'Vencimiento',body:`<div class="group"><label class="row"><span>Vence en ${mLabel(M,'month').toLowerCase()}</span><input id="du-date" type="date" value="${cur0}"></label>
-    <label class="row"><span>Todos los meses el día</span><select id="du-day"><option value="">Sin definir</option>${[...Array(31)].map((_,i)=>`<option value="${i+1}" ${+c.dueDay===i+1?'selected':''}>${i+1}</option>`).join('')}</select></label></div>
-    <div class="hint">El resumen de cada mes vence el día que elijas. Si un mes vence otro día, cambiá solo la fecha de ese mes.</div>`,
-    onSave:async()=>{const d=$('#du-date').value;const day=+$('#du-day').value||null;const dues={...(c.dues||{})};
-      if(d&&d!==(day?M+'-'+pad(Math.min(day,daysIn(M))):''))dues[M]=d;else delete dues[M];
+  const only=!!(c.dues&&c.dues[M]);
+  openSheet({title:'Vencimiento',body:`<div class="group"><label class="row"><span>Resumen de ${mLabel(M,'month').toLowerCase()}</span>${dateField('du-date',cur0)}</label>
+    <label class="row"><span>Solo para este mes</span><input id="du-only" type="checkbox" class="switch" ${only?'checked':''}></label></div>
+    <div class="hint">Apagado, el día que elijas queda para todos los meses. Prendido, solo cambia el vencimiento de ${mLabel(M,'month').toLowerCase()}.</div>`,
+    onSave:async()=>{const d=$('#du-date').value;if(!d){toast('Elegí la fecha');return false}const dues={...(c.dues||{})};let day=c.dueDay||null;
+      if($('#du-only').checked)dues[M]=d;else{day=+d.slice(8,10);delete dues[M]}
       return write(()=>B.saveSettings({...S.settings,cards:(S.settings.cards||[]).map(x=>x.id===id?{...x,dueDay:day,dues}:x)}),'Vencimiento guardado')}});
-  $('#du-day').onchange=()=>{const v=+$('#du-day').value;if(v)$('#du-date').value=M+'-'+pad(Math.min(v,daysIn(M)))};
 }
 function openPayCard(id,M,pay){
   const c=cardById(id);const list=accs();if(!list.length){toast('Primero creá una cuenta');return}
@@ -963,7 +984,7 @@ function openPayCard(id,M,pay){
   const st={mode:isEdit&&Math.abs(pay.amount-restNow)>0.009?'otro':'total'};
   const due=c?cardDue(c,M):null;
   const defD=isEdit?pay.date:M<NOW_M?(due&&due.slice(0,7)===M?due:M+'-'+pad(daysIn(M))):TODAY_S;
-  const accId=isEdit?pay.acc.id:(c&&S.accounts[c.acc]?c.acc:(UI.acc!=='all'&&S.accounts[UI.acc]?UI.acc:list[0].id));
+  const pySt={};const accId=pySt.acc=isEdit?pay.acc.id:(c&&S.accounts[c.acc]?c.acc:(UI.acc!=='all'&&S.accounts[UI.acc]?UI.acc:list[0].id));
   const body=`<div class="group">
       <div class="row"><span>Resumen de ${mLabel(M,'month').toLowerCase()}</span><span class="muted num">${money(s.total)}</span></div>
       ${s.paid-(isEdit?pay.amount:0)>0.009?`<div class="row"><span>Ya pagaste</span><span class="muted num">${money(s.paid-(isEdit?pay.amount:0))}</span></div>`:''}
@@ -971,15 +992,15 @@ function openPayCard(id,M,pay){
     <div class="seg" id="py-mode"><button type="button" data-k="total" aria-pressed="${st.mode==='total'}">Total</button><button type="button" data-k="otro" aria-pressed="${st.mode==='otro'}">Otro monto</button></div>
     <label class="amount" id="py-amt-w" ${st.mode==='otro'?'':'hidden'}><span class="cur">${esc(curSymbol())}</span><input id="py-amt" inputmode="decimal" placeholder="0" autocomplete="off" aria-label="Monto pagado" value="${isEdit?plainNum(pay.amount):''}"></label>
     <div><div class="group">
-      <label class="row"><span>Fecha de pago</span><input id="py-date" type="date" value="${defD}"></label>
-      <label class="row"><span>Cuenta</span><select id="py-acc">${list.map(a=>`<option value="${a.id}" ${a.id===accId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
-    </div><div class="hint">El pago se carga como un gasto en esa cuenta y ahí sí se descuenta de tu disponible. Si pagás menos que el total, lo que falta pasa al resumen del mes siguiente.</div></div>`;
+      <label class="row"><span>Fecha de pago</span>${dateField('py-date',defD)}</label>
+    </div></div><div>${list.length>1?`<div class="g-label">Lo pagás desde</div><div class="group">${accChips(accId,'pyacc')}</div>`:''}<div class="hint">El pago se carga como un gasto en esa cuenta y ahí sí se descuenta de tu disponible. Si pagás menos que el total, lo que falta pasa al resumen del mes siguiente.</div></div>`;
   openSheet({title:(isEdit?'Pago de ':'Pagar ')+cardName(c),body,saveLabel:isEdit?'Guardar':'Pagar',foot:isEdit?'<button class="btn danger" id="py-del">Eliminar pago</button>':'',onSave:async()=>{
     const amt=st.mode==='total'?restNow:round2(parseAmount($('#py-amt').value));
     if(!(amt>0)){if(st.mode==='total')toast('No queda nada por pagar');else{shake($('#py-amt-w'));toast('Ingresá cuánto pagaste')}return false}
-    const date=$('#py-date').value||TODAY_S;const a=S.accounts[$('#py-acc').value];
+    const date=$('#py-date').value||TODAY_S;const a=S.accounts[pySt.acc];
     const m={kind:'variable',amount:amt,cur:cur(),fx:null,notif:null,desc:'Pago tarjeta '+cardName(c),cat:'tarjeta',catName:'Tarjeta',date,due:null,month:date.slice(0,7),rec:false,goal:null,end:null,skip:[],paid:[],card:id,cardM:M,by:pay?.by||ME.uid||null,created:pay?.created||Date.now()};
     return write(async()=>{if(isEdit&&a.id!==pay.acc.id)await B.delMov(pay.acc,pay.id);await B.putMov(a,{...m,id:isEdit&&a.id===pay.acc.id?pay.id:newId()})},isEdit?'Pago actualizado':amt>=restNow-0.009?'¡Tarjeta pagada!':'Pago parcial cargado')}});
+  bindChips($('#sheet-root'),'pyacc',v=>pySt.acc=v);
   bindSeg($('#py-mode'),k=>{st.mode=k;$('#py-amt-w').hidden=k!=='otro';if(k==='otro'){if(!$('#py-amt').value)$('#py-amt').value=restNow>0?plainNum(restNow):'';setTimeout(()=>$('#py-amt').focus(),50)}});
   $('#py-del')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>B.delMov(pay.acc,pay.id),'Pago eliminado'))closeSheet()}));
 }
@@ -1227,6 +1248,25 @@ function shake(el){el.classList.remove('shake');void el.offsetWidth;el.classList
 function confirmBtn(btn,fn,label='Tocá de nuevo para confirmar'){if(btn.dataset.armed){fn();return}btn.dataset.armed='1';const old=btn.textContent;btn.textContent=label;setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent=old}},3500)}
 const chipsHTML=(cats,sel,name)=>`<div class="chips" data-chips="${name}">${cats.map(c=>`<button type="button" class="chip" data-v="${c.id}" aria-pressed="${c.id===sel}"><span class="ci" style="background:${col(c.color)}">${icon(c.icon)}</span>${esc(c.name)}</button>`).join('')}</div>`;
 function bindChips(root,name,onPick){root.querySelector(`[data-chips="${name}"]`)?.addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;root.querySelectorAll(`[data-chips="${name}"] [data-v]`).forEach(x=>x.setAttribute('aria-pressed',x===b));onPick(b.dataset.v)})}
+/* Selector de fecha propio: muestra dd/mm/aaaa y abre un calendario debajo de la fila.
+   Guarda el valor (aaaa-mm-dd) en un input oculto con el mismo id y avisa con un evento change. */
+const fmtDMY=d=>d?d.split('-').reverse().join('/'):'';
+function dateField(id,val,{empty='Elegir',clear=false}={}){return `<button type="button" class="date-btn" data-date-for="${id}" ${clear?'data-clear="1"':''} data-empty="${esc(empty)}" aria-expanded="false"><span>${val?fmtDMY(val):esc(empty)}</span>${icon('calendar')}</button><input type="hidden" id="${id}" value="${val||''}">`}
+function setDate(id,v,silent){const i=document.getElementById(id);if(!i)return;i.value=v||'';const b=document.querySelector(`[data-date-for="${id}"]`);if(b)b.querySelector('span').textContent=v?fmtDMY(v):b.dataset.empty;if(!silent)i.dispatchEvent(new Event('change',{bubbles:true}))}
+function toggleCal(b){const row=b.closest('.row')||b;const wasOpen=row.nextElementSibling?.classList.contains('cal');
+  document.querySelectorAll('.cal').forEach(c=>c.remove());document.querySelectorAll('.date-btn[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false'));if(wasOpen)return;
+  const id=b.dataset.dateFor;let view=(document.getElementById(id).value||TODAY_S).slice(0,7);
+  const cal=document.createElement('div');cal.className='cal';row.after(cal);b.setAttribute('aria-expanded','true');
+  const draw=()=>{const[y,m]=view.split('-').map(Number);const first=(new Date(y,m-1,1).getDay()+6)%7;const cur0=document.getElementById(id).value;
+    cal.innerHTML=`<div class="cal-h"><button type="button" data-cm="-1" aria-label="Mes anterior">${icon('left')}</button><b>${mLabel(view)}</b><button type="button" data-cm="1" aria-label="Mes siguiente">${icon('right')}</button></div>
+    <div class="cal-g">${['L','M','M','J','V','S','D'].map(d=>`<span class="wd">${d}</span>`).join('')}${'<span></span>'.repeat(first)}${[...Array(daysIn(view))].map((_,i)=>{const d=view+'-'+pad(i+1);return `<button type="button" data-cd="${d}" class="${d===TODAY_S?'today':''}" aria-pressed="${d===cur0}" aria-label="${fmtDMY(d)}">${i+1}</button>`}).join('')}</div>
+    <div class="cal-f"><button type="button" class="link small" data-cd="${TODAY_S}">Hoy</button>${b.dataset.clear?'<button type="button" class="link small" data-cd="">Sin definir</button>':''}</div>`};
+  cal.onclick=e=>{const x=e.target.closest('button');if(!x)return;e.preventDefault();e.stopPropagation();
+    if(x.dataset.cm){view=addM(view,+x.dataset.cm);draw();return}
+    if(x.dataset.cd!=null){setDate(id,x.dataset.cd);cal.remove();b.setAttribute('aria-expanded','false')}};
+  draw();setTimeout(()=>cal.scrollIntoView({block:'nearest',behavior:'smooth'}),30)}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-date-for]');if(b){e.preventDefault();toggleCal(b)}});
+const accChips=(sel,name)=>`<div class="acc-chips">${chipsHTML(accs().map(a=>({id:a.id,name:a.name,color:a.color||'blue',icon:a.scope==='s'?'people':'wallet'})),sel,name)}</div>`;
 function bindSeg(el,onPick){el.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));onPick(b.dataset.k)})}
 
 function openMovSheet(mov,preset={}){
@@ -1253,9 +1293,9 @@ function openMovSheet(mov,preset={}){
     <div id="f-cuo-w" ${st.kind==='variable'?'':'hidden'}><div class="group"><label class="row"><span>En cuotas con tarjeta</span><input id="f-cuo" type="checkbox" class="switch" ${st.cuo?'checked':''}></label></div><div id="f-cuo-box"></div></div>
     <div><div class="group">
       <label class="row"><span>Descripción</span><input id="f-desc" value="${esc(m.desc)}" placeholder="Opcional" maxlength="80"></label>
-      <label class="row"><span>Fecha</span><input id="f-date" type="date" value="${m.date}"></label>
+      <label class="row"><span>Fecha</span>${dateField('f-date',m.date)}</label>
       <label class="row" id="row-rate" hidden><span id="f-rate-l">Cotización</span><input id="f-rate" inputmode="decimal" placeholder="0" autocomplete="off" value="${st.rate?rateNum(st.rate):''}"></label>
-      <label class="row" id="row-due" ${st.kind==='fijo'?'':'hidden'}><span>Fecha de vencimiento</span><input id="f-due" type="date" value="${m.due||m.date}"></label>
+      <label class="row" id="row-due" ${st.kind==='fijo'?'':'hidden'}><span>Fecha de vencimiento</span>${dateField('f-due',m.due||m.date)}</label>
       <label class="row"><span>Cuenta</span><select id="f-acc">${list.map(a=>`<option value="${a.id}" ${a.id===st.acc?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       <label class="row" id="row-rec" ${st.cuo&&st.kind==='variable'?'hidden':''}><span>Se repite todos los meses</span><input id="f-rec" type="checkbox" class="switch" ${m.rec&&!isCuo?'checked':''}></label>
       <label class="row" id="row-notif" ${st.kind==='fijo'?'':'hidden'}><span>Aviso de vencimiento</span><select id="f-notif">
