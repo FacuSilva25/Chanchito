@@ -30,7 +30,7 @@ Es la misma app de siempre, preparada para publicarla en internet. Cualquiera en
 1. Creá un repositorio **público** en GitHub, por ejemplo `chanchito`.
 2. Subí el contenido de esta carpeta a la raíz del repo (o pedime que lo suba yo).
 3. En el repo, andá a **Settings > Pages > Source: Deploy from a branch**, elegí `main` y la carpeta `/ (root)`.
-4. En un minuto queda en `https://<tu-usuario>.github.io/chanchito/`. Ese es el link que le pasás a la gente.
+4. En un minuto queda en `https://<tu-usuario>.github.io/chanchito/` (la de Facundo: https://facusilva25.github.io/chanchito/). Ese es el link que le pasás a la gente.
 
 Sirve cualquier hosting que use https: Netlify, Vercel, Cloudflare Pages, etc.
 
