@@ -1,8 +1,8 @@
 /* Chanchito service worker.
    Para publicar una versión nueva: cambiá VERSION (y anotá qué cambió en NOTES).
    Los usuarios ven "Hay una versión nueva" y la instalan con el botón Actualizar. */
-const VERSION = '1.1.0';
-const NOTES = 'Ahora podés importar y descargar un respaldo de tus datos desde Configuración.';
+const VERSION = '1.2.0';
+const NOTES = 'Ahora podés importar tu planilla de gastos (Excel o CSV) desde Configuración › Tus datos.';
 const CACHE = 'chanchito-' + VERSION;
 const FILES = [
   './', './index.html', './config.js', './js/backend.js', './manifest.webmanifest',

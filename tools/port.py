@@ -182,6 +182,8 @@ rep("  closeSheet:()=>closeSheet(),\n};", """  closeSheet:()=>closeSheet(),
   forgot:()=>forgotPassword(),
   importData:()=>pickBackup(),
   exportData:()=>exportBackup(),
+  importSheet:()=>pickSheet(),
+  sheetTemplate:()=>downloadSheetTemplate(),
 };""")
 rep("{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h))UI.tab=h}",
     "{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)||h==='config')UI.tab=h}")
