@@ -629,7 +629,9 @@ const isCardPayMov=m=>!!(m.card&&m.cardM&&m.kind!=='cuota');
 // i0: en qué cuota iba la compra cuando se cargó (por defecto 1); month es el mes de esa cuota
 function cuotaIdx(m,M){if(!m.rec)return m.idx||1;const[y1,m1]=m.month.split('-').map(Number),[y2,m2]=M.split('-').map(Number);return (y2-y1)*12+(m2-m1)+(m.i0||1)}
 function cardMovs(){const out=[];for(const a of accs())for(const m of Object.values(a.movs))if(m.card&&(m.kind==='cuota'||m.cardM))out.push({...m,acc:a});return out}
-function cardDue(c,M){if(c.dues&&c.dues[M])return c.dues[M];if(c.dueDate&&c.dueDate.slice(0,7)===M)return c.dueDate;return c.dueDay?M+'-'+pad(Math.min(+c.dueDay,daysIn(M))):null}
+// vencimiento del resumen del mes M: el de ese mes puntual, o la fecha que elegiste (que también vale para los meses
+// de acá hasta esa fecha), o el mismo día todos los meses
+function cardDue(c,M){if(c.dues&&c.dues[M])return c.dues[M];if(c.dueDate){const DM=c.dueDate.slice(0,7);if(DM===M||(M>=NOW_M&&M<DM))return c.dueDate}return c.dueDay?M+'-'+pad(Math.min(+c.dueDay,daysIn(M))):null}
 // mes de la primera cuota: si la tarjeta tiene día de cierre y compraste después del cierre, va al resumen siguiente
 function firstCuotaM(c,date){let M=date.slice(0,7);if(c&&c.closeDay){if(+date.slice(8,10)>+c.closeDay)M=addM(M,1);
   if(c.dueDate&&c.closeDate){const[y1,m1]=c.closeDate.split('-').map(Number),[y2,m2]=c.dueDate.split('-').map(Number);const gap=(y2-y1)*12+(m2-m1);M=addM(M,gap>=0&&gap<=2?gap:(+c.dueDay<=+c.closeDay?1:0))}
@@ -1020,7 +1022,7 @@ function openCardDueSheet(id){
     <div class="hint">Apagado, el día que elijas queda para todos los meses. Prendido, solo cambia el vencimiento de ${mLabel(M,'month').toLowerCase()}.</div>`,
     onSave:async()=>{const d=$('#du-date').value;if(!d){toast('Elegí la fecha');return false}const dues={...(c.dues||{})};let day=c.dueDay||null;
       const all=!$('#du-only').checked;if(!all)dues[M]=d;else{day=+d.slice(8,10);delete dues[M]}
-      return write(()=>B.saveSettings({...S.settings,cards:(S.settings.cards||[]).map(x=>x.id===id?{...x,dueDay:day,dues,...(all?{dueDate:d}:{})}:x)}),'Vencimiento guardado')}});
+      return write(()=>B.saveSettings({...S.settings,cards:(S.settings.cards||[]).map(x=>x.id===id?{...x,dueDay:day,dues,...(all?{dueDate:M>=NOW_M&&(!x.dueDate||x.dueDate.slice(0,7)>=M)?d:null}:{})}:x)}),'Vencimiento guardado')}});
 }
 function openPayCard(id,M,pay){
   const c=cardById(id);const list=accs();if(!list.length){toast('Primero creá una cuenta');return}
