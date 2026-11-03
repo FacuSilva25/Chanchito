@@ -82,3 +82,11 @@ Desde Google Sheets: **Archivo > Descargar > Microsoft Excel (.xlsx)**. En Confi
 - En **Moneda** elegís qué dólar se usa para los pesos: Blue (por defecto), Oficial, MEP o Tarjeta.
 - Si cambiás la moneda de la app, te ofrece convertir todos tus movimientos y metas con la cotización del día de cada uno. Como el monto original queda guardado, volver a la moneda anterior recupera los números exactos. También podés cambiar solo el símbolo, sin convertir.
 - Cotizaciones: [dolarapi.com](https://dolarapi.com) (dólar hoy), [argentinadatos.com](https://argentinadatos.com) (historia del dólar) y [currency-api](https://github.com/fawazahmed0/exchange-api) (el resto de las monedas). Son gratis y no necesitan clave.
+
+## Tarjetas y cuotas
+
+- En **Tarjetas** (debajo de Movimientos) cargás tus tarjetas: Visa, Mastercard u otra; de crédito, débito o prepaga; los últimos 4 números (opcional); el día de vencimiento y, si querés, el día de cierre.
+- Al cargar un gasto variable activás **En cuotas con tarjeta**, elegís la tarjeta y 1, 3, 6, 12, 24 o 36 cuotas, y si es con interés, cuánto (en %). La app divide el monto y pone cada cuota en el resumen de su mes. Si la tarjeta tiene día de cierre, lo que comprás después del cierre va al resumen siguiente.
+- Las cuotas **no se descuentan** de tu disponible. Se descuenta el pago: en Tarjetas tocás **Pagar** y elegís el total u otro monto. El pago queda como un gasto (categoría Tarjeta) en la cuenta que elijas. Si pagás menos, lo que falta pasa al resumen del mes siguiente.
+- Cada tarjeta muestra lo que hay que pagar ese mes, y arriba está el total de todas. El vencimiento de un mes puntual se cambia tocando la fecha.
+- Al importar una planilla con compras con tarjeta, podés mandarlas directo a una tarjeta. Las cuotas de meses anteriores se marcan como pagadas.
