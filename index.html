@@ -355,6 +355,7 @@ body.auth-mode .app{grid-template-columns:1fr}
 .cal-g button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
 .cal-f{display:flex;justify-content:space-between;gap:8px;padding-top:8px}
 .acc-chips{padding:10px 14px}
+.cd-h{display:flex;align-items:center;gap:12px;padding:0 4px 10px}
 .stepper{display:inline-flex;align-items:center;gap:10px;margin-left:auto}
 .stepper b{min-width:64px;text-align:center;font-weight:600}
 @media (max-width:420px){.tab{min-width:0;padding:6px 5px;font-size:10px}.tabbar-in{gap:0}}
@@ -787,6 +788,7 @@ function renderTop(){
         <button class="hbtn" data-act="currency" aria-label="Moneda: ${cur()}"><span class="num">${cur()}</span></button>
         <button class="hbtn" data-act="notifs" aria-label="Avisos de vencimientos${dueN?': '+dueN+' pendientes':''}">${icon('bell')}${dueN?`<span class="badge">${dueN}</span>`:''}</button>
         ${UI.tab!=='config'?`<button class="hbtn only-narrow" data-act="tab" data-tab="config" aria-label="Configuración">${icon('gear')}${UPD.waiting?'<span class="badge">1</span>':''}</button>`:''}
+        ${UI.tab==='tarjetas'&&(cards().length||cardMovs().length)?`<button class="btn secondary sm" data-act="cardsDetail">${icon('list')}Detalle tarjetas</button>`:''}
         ${showMonth&&list.length?`<button class="btn sm only-wide" data-act="newMov">${icon('plus')}Nuevo movimiento</button>`:''}
       </div>
     </div>
@@ -930,7 +932,7 @@ function viewTarjetas(){
         ${Math.abs(s.carry)>0.009?`<div><span>${s.carry>0?'Saldo que quedó del mes anterior':'A favor del mes anterior'}</span><span class="num">${s.carry>0?'':'−'}${money(Math.abs(s.carry))}</span></div><div><span>Total del resumen</span><span class="num">${money(s.total)}</span></div>`:''}
         ${s.pays.map(p=>`<button data-act="editMov" data-acc="${p.acc.id}" data-id="${p.id}"><span>Pagaste el ${fmtDay(p.date)}${accs().length>1?' · '+esc(p.acc.name):''}</span><span class="num" style="color:var(--pos)">−${money(p.amount)}</span></button>`).join('')}
       </div>`:''}
-      <div class="goal-actions">${s.rest>0.009?`<button class="btn sm" data-act="payCard" data-id="${esc(id)}" data-m="${M}">${icon('check')}Pagar</button>`:''}<button class="btn secondary sm" data-act="newCuota" data-id="${esc(id)}">${icon('plus')}Compra en cuotas</button></div>
+      <div class="goal-actions">${s.rest>0.009?`<button class="btn sm" data-act="payCard" data-id="${esc(id)}" data-m="${M}">${icon('check')}Pagar</button>`:''}<button class="btn secondary sm" data-act="cardsDetail" data-id="${esc(id)}">${icon('list')}Detalle</button><button class="btn secondary sm" data-act="newCuota" data-id="${esc(id)}">${icon('plus')}Compra en cuotas</button></div>
     </section>`};
   return `<section class="hero"><div><div class="tile-l">Total a pagar de tarjetas en ${mLabel(M,'month').toLowerCase()}</div><div class="hero-v num">${money(tot.rest)}</div></div>
     <div class="hero-sub"><span>Resúmenes <b style="color:var(--label)" class="num">${money(tot.total)}</b></span><span>Pagado <b style="color:var(--label)" class="num">${money(tot.paid)}</b></span><span>No se descuenta de tu plata hasta que pagás.</span></div>
@@ -969,6 +971,24 @@ function openCardSheet(c,preset={}){
     return ok}
   $('#cd-del')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{
     if(await write(()=>B.saveSettings({...S.settings,cards:(S.settings.cards||[]).filter(x=>x.id!==c.id)}),'Tarjeta eliminada'))closeSheet()},nCuo?`Tiene ${nCuo} movimientos. Tocá de nuevo para eliminarla`:'Tocá de nuevo para eliminar'));
+}
+// Detalle de todas las compras en cuotas que siguen vivas desde el mes M, separadas por tarjeta
+function cuotasLeft(m,M){const n=m.n||1;if(!m.rec){if(m.month<M)return null;return {i:m.idx||1,n,left:1,per:amtIn(m,m.month),start:m.month,last:m.month,now:m.month===M}}
+  if(m.end&&m.end<M)return null;const now=occurs(m,M);const ref=m.month>M?m.month:M;const i=cuotaIdx(m,ref);const per=amtIn(m,ref);
+  return {i,n,left:n-i+1,per,start:m.month,last:m.end||addM(m.month,n-(m.i0||1)),now}}
+function openCardsDetail(only){
+  const M=UI.month;const all=cardMovs();const ids=only?[only]:cardIds(all);let grand=0;
+  const sec=ids.map(id=>{const c=cardById(id);
+    const rows=all.filter(m=>m.card===id&&m.kind==='cuota').map(m=>({m,q:cuotasLeft(m,M)})).filter(x=>x.q).sort((a,b)=>(b.q.now-a.q.now)||(a.q.last||'').localeCompare(b.q.last||''));
+    const tot=round2(rows.reduce((t,{q})=>t+q.per*q.left,0));grand+=tot;
+    const s=cardStmt(id,M,all);
+    return `<div><div class="cd-h">${plastic(c)}<div style="min-width:0;flex:1"><h3 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cardName(c))}</h3><span class="muted small">${rows.length} ${rows.length===1?'compra':'compras'} · Te queda <b class="num" style="color:var(--label)">${money(tot)}</b></span><span class="muted small" style="display:block">A pagar en ${mLabel(M,'month').toLowerCase()}: ${money(Math.max(s.rest,0))}</span></div></div>
+      ${rows.length?`<div class="group" style="padding:0 14px"><div class="list">${rows.map(({m,q})=>{const ci=catInfo(m.cat,m.catName);return `<button class="li" data-act="cuotaInfo" data-acc="${m.acc.id}" data-id="${m.id}" data-m="${q.now?M:q.start}">
+        <span class="li-ic" style="background:${col(ci.color)};width:32px;height:32px">${icon(ci.icon)}</span>
+        <span class="li-main"><span class="li-t">${esc(m.desc)}</span><span class="li-s li-wrap">${q.n>1?`<span class="tag rec num">${q.now?'Cuota':'Empieza con la'} ${q.i}/${q.n}</span>`:'<span>1 pago</span>'}${!q.now?`<span>en ${mLabel(q.start).toLowerCase()}</span>`:''}${q.n>1?(q.now?(q.left>1?`<span>Quedan ${q.left-1} · <b class="num">${money(q.per*(q.left-1))}</b></span>`:'<span>Última cuota</span>'):`<span>${q.left} cuotas · <b class="num">${money(q.per*q.left)}</b></span>`)+(q.left>1||!q.now?`<span>Última: ${mLabel(q.last,'short')} ${q.last.slice(0,4)}</span>`:''):''}</span></span>
+        <span class="li-amt">${money(q.per)}</span></button>`}).join('')}</div></div>`:`<p class="muted small" style="margin:0 14px">No hay cuotas pendientes.</p>`}</div>`}).join('');
+  openSheet({title:only?'Detalle de '+cardName(cardById(only)):'Detalle de tarjetas',saveLabel:'Listo',onSave:()=>true,
+    body:`${!only&&ids.length>1?`<div class="group"><div class="row"><span>Te queda pagar en todas las tarjetas</span><b class="num">${money(grand)}</b></div></div>`:''}${sec}<div class="hint" style="padding-top:0">Desde ${mLabel(M).toLowerCase()}. Tocá una compra para ver todo su detalle.</div>`});
 }
 function openCuotaInfo(accId,id,M){
   const a=S.accounts[accId];const m=a?.movs[id];if(!m)return;const c=cardById(m.card);const ci=catInfo(m.cat,m.catName);
@@ -1641,6 +1661,7 @@ const ACT={
   editCard:d=>{const c=cardById(d.id);c?openCardSheet(c):openCardSheet(null,{id:d.id})},
   cardDue:d=>openCardDueSheet(d.id),
   cuotaInfo:d=>openCuotaInfo(d.acc,d.id,d.m||UI.month),
+  cardsDetail:d=>openCardsDetail(d.id||null),
   payCard:d=>openPayCard(d.id,d.m||UI.month),
   newCuota:d=>openMovSheet(null,{kind:'variable',cuotas:true,card:d.id||''}),
   paid:async(d,btn)=>{const a=S.accounts[d.acc];const m=a?.movs[d.id];if(!m)return;const M=d.month||UI.month;const p=new Set(m.paid||[]);p.has(M)?p.delete(M):p.add(M);btn.setAttribute('aria-pressed',p.has(M));await write(()=>B.putMov(a,{...m,paid:[...p]}),p.has(M)?'Marcado como pagado':null)},
