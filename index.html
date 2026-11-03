@@ -355,6 +355,8 @@ body.auth-mode .app{grid-template-columns:1fr}
 .cal-g button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
 .cal-f{display:flex;justify-content:space-between;gap:8px;padding-top:8px}
 .acc-chips{padding:10px 14px}
+.stepper{display:inline-flex;align-items:center;gap:10px;margin-left:auto}
+.stepper b{min-width:64px;text-align:center;font-weight:600}
 @media (max-width:420px){.tab{min-width:0;padding:6px 5px;font-size:10px}.tabbar-in{gap:0}}
 </style>
 </head>
@@ -913,7 +915,7 @@ function viewTarjetas(){
     const due=c?cardDue(c,M):null;const st=s.total<=0.009?'':s.rest<=0.009?'<span class="tag ok">Pagada</span>':s.paid>0?'<span class="tag pend">Pago parcial</span>':'<span class="tag pend">Por pagar</span>';
     let dueTxt='';if(due){const[y,mm,dd]=due.split('-').map(Number);const diff=Math.round((new Date(y,mm-1,dd)-new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()))/864e5);
       dueTxt=s.rest>0.009&&diff<=7&&diff>=-30?dueTag({M,day:dd,diff}):`Vence el ${fmtDay(due)}`}
-    const cuotaRow=o=>{const ci=catInfo(o.cat,o.catName);return `<button class="li" data-act="editMov" data-acc="${o.acc.id}" data-id="${o.id}">
+    const cuotaRow=o=>{const ci=catInfo(o.cat,o.catName);return `<button class="li" data-act="cuotaInfo" data-acc="${o.acc.id}" data-id="${o.id}" data-m="${M}">
       <span class="li-ic" style="background:${col(ci.color)};width:32px;height:32px">${icon(ci.icon)}</span>
       <span class="li-main"><span class="li-t">${esc(o.desc)}</span><span class="li-s li-wrap">${(()=>{const n=o.n||1,left=Math.max(n-o.i,0);
         return n>1?`<span class="tag rec num">Cuota ${o.i}/${n}</span>${left?`<span>Quedan ${left} · <b class="num">${money(o.amount*left)}</b></span>`:'<span>Última cuota</span>'}`:'<span>1 pago</span>'})()}<span>${+o.int?plainNum(+o.int)+'% de interés':'Sin interés'}</span></span></span>
@@ -967,6 +969,20 @@ function openCardSheet(c,preset={}){
     return ok}
   $('#cd-del')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{
     if(await write(()=>B.saveSettings({...S.settings,cards:(S.settings.cards||[]).filter(x=>x.id!==c.id)}),'Tarjeta eliminada'))closeSheet()},nCuo?`Tiene ${nCuo} movimientos. Tocá de nuevo para eliminarla`:'Tocá de nuevo para eliminar'));
+}
+function openCuotaInfo(accId,id,M){
+  const a=S.accounts[accId];const m=a?.movs[id];if(!m)return;const c=cardById(m.card);const ci=catInfo(m.cat,m.catName);
+  const n=m.n||1,i=cuotaIdx(m,M),per=amtIn(m,M),left=Math.max(n-i,0);
+  const firstM=m.rec?addM(m.month,-((m.i0||1)-1)):addM(m.month,-(i-1)),lastM=addM(firstM,n-1);
+  const tot=per*n,base=+m.int?tot/(1+m.int/100):tot;
+  const r=(l,v)=>`<div class="row"><span>${l}</span><span class="muted num" style="text-align:right">${v}</span></div>`;
+  const body=`<div style="display:flex;align-items:center;gap:12px;padding:0 4px"><span class="li-ic" style="background:${col(ci.color)};width:44px;height:44px">${icon(ci.icon)}</span>
+      <div style="min-width:0"><h3 style="overflow:hidden;text-overflow:ellipsis">${esc(m.desc)}</h3><span class="muted small">${esc(ci.name)}${accs().length>1?' · '+esc(a.name):''}</span></div></div>
+    <div class="group">${r('Tarjeta',esc(cardName(c))+(c&&c.num?' •••• '+esc(c.num):''))}${r('Cuota de '+mLabel(M,'month').toLowerCase(),`<b style="color:var(--label)">${n>1?i+' de '+n:'1 pago'}</b>`)}${r('Valor de la cuota',money(per))}</div>
+    ${n>1?`<div class="group">${r('Te quedan',left?`${left} ${left===1?'cuota':'cuotas'} después de esta`:'Es la última')}${left?r('Lo que queda por pagar',`<b style="color:var(--label)">${money(per*left)}</b>`):''}${r('Con esta incluida',money(per*(left+1)))}${r('Última cuota',mLabel(lastM))}</div>`:''}
+    <div class="group">${r('Total de la compra',money(tot))}${r('Interés',+m.int?plainNum(+m.int)+'% ('+money(tot-base)+')':'Sin interés')}${r('Fecha de compra',fmtDMY(m.date))}${n>1?r('Primera cuota',mLabel(firstM)):''}</div>`;
+  openSheet({title:'Detalle de la cuota',body,saveLabel:'Listo',onSave:()=>true,foot:`<button class="btn secondary" id="ci-edit">${icon('pencil')}Editar compra</button>`});
+  $('#ci-edit').onclick=()=>{closeSheet();setTimeout(()=>{const f=findMov(accId,id);if(f)openMovSheet(f)},320)};
 }
 function openCardDueSheet(id){
   const c=cardById(id);if(!c)return;const M=UI.month;const cur0=cardDue(c,M)||M+'-10';
@@ -1322,8 +1338,8 @@ function openMovSheet(mov,preset={}){
     if(!(a>0)){el.textContent=`Escribí arriba el precio total${st.intOn?' sin interés':''} y te lo divido en ${st.n} ${st.n===1?'pago':'cuotas'}.`;return}
     const tot=a*(r>0?r:1)*(1+(st.intOn?st.int:0)/100),per=tot/st.n,left=st.n-st.i0+1;
     el.innerHTML=st.n===1?`1 pago de <b>${money(tot)}</b>`:`${st.n} cuotas de <b>${money(per)}</b> · Total <b>${money(tot)}</b>${st.intOn&&st.int?` (${money(tot-a*(r>0?r:1))} de interés)`:''}${st.i0>1?`<br>Vas por la cuota ${st.i0}: se cargan ${left===1?'la última':'las '+left+' que quedan'} (<b>${money(per*left)}</b>). Las anteriores se toman como ya pagadas.`:''}${($('#f-first')?.value||'').slice(0,7)<NOW_M&&st.n>1?'<br>Ojo: las cuotas de meses que ya pasaron quedan como deuda en la tarjeta. Si ya las pagaste, elegí en qué cuota vas.':''}`};
-  const i0Opts=()=>{const sel=$('#f-i0');if(!sel)return;if(st.i0>st.n)st.i0=1;$('#row-i0').hidden=st.n<2;
-    sel.innerHTML=[...Array(Math.max(st.n,1))].map((_,i)=>`<option value="${i+1}" ${i+1===st.i0?'selected':''}>${i+1} de ${st.n}</option>`).join('');
+  const i0Opts=()=>{const v=$('#f-i0v');if(!v)return;if(st.i0>st.n)st.i0=1;$('#row-i0').hidden=st.n<2;
+    v.textContent=`${st.i0} de ${st.n}`;$('#f-i0-m').disabled=st.i0<=1;$('#f-i0-p').disabled=st.i0>=st.n;
     const l=$('#f-first-l');if(l)l.textContent=st.i0>1?`Fecha de la cuota ${st.i0}`:'Primera cuota'};
   // fecha de la primera cuota (o de la cuota en la que vas): se elige con el calendario, cualquier fecha; vale el mes
   const firstOpts=()=>{if(!$('#f-first')||st.firstManual)return;const d=$('#f-date').value||defDate();const c=cardById(st.card);
@@ -1343,7 +1359,7 @@ function openMovSheet(mov,preset={}){
       <div class="group">
         <label class="row" id="row-int" ${st.intOn?'':'hidden'}><span>Interés total (%)</span><input id="f-intp" inputmode="decimal" placeholder="Ej: 25" autocomplete="off" value="${st.int?plainNum(st.int):''}"></label>
         <label class="row" id="row-nc" ${st.nOther?'':'hidden'}><span>Cantidad de cuotas</span><input id="f-nc" inputmode="numeric" placeholder="Ej: 9" autocomplete="off" maxlength="2" value="${st.nOther?st.n:''}"></label>
-        <label class="row" id="row-i0"><span>Vas por la cuota</span><select id="f-i0"></select></label>
+        <div class="row" id="row-i0"><span>Vas por la cuota</span><span class="stepper"><button type="button" class="icon-btn" id="f-i0-m" aria-label="Cuota anterior">${icon('minus')}</button><b id="f-i0v" class="num" aria-live="polite"></b><button type="button" class="icon-btn" id="f-i0-p" aria-label="Cuota siguiente">${icon('plus')}</button></span></div>
         <label class="row"><span id="f-first-l">Primera cuota</span>${dateField('f-first','')}</label>
       </div>
       <div class="hint" id="f-cuo-hint" style="padding-top:0"></div>
@@ -1351,7 +1367,7 @@ function openMovSheet(mov,preset={}){
     bindChips(box,'card',v=>{st.card=v;firstOpts()});
     bindSeg($('#f-n'),k=>{st.nOther=k==='otra';$('#row-nc').hidden=!st.nOther;if(st.nOther){const v=parseInt($('#f-nc').value);if(v>0)st.n=v;setTimeout(()=>$('#f-nc').focus(),50)}else st.n=+k;i0Opts();cuoHint()});
     $('#f-nc').addEventListener('input',()=>{const v=parseInt($('#f-nc').value.replace(/\D/g,''));if(v>0&&v<=72){st.n=v;i0Opts();cuoHint()}});
-    $('#f-i0').onchange=()=>{st.i0=+$('#f-i0').value;i0Opts();cuoHint()};i0Opts();
+    const stepI0=d=>{st.i0=Math.min(Math.max(st.i0+d,1),st.n);i0Opts();cuoHint()};$('#f-i0-m').onclick=()=>stepI0(-1);$('#f-i0-p').onclick=()=>stepI0(1);i0Opts();
     bindSeg($('#f-int'),k=>{st.intOn=k==='1';$('#row-int').hidden=!st.intOn;if(st.intOn)setTimeout(()=>$('#f-intp').focus(),50);cuoHint()});
     $('#f-intp').addEventListener('input',()=>{st.int=parseAmount($('#f-intp').value)||0;cuoHint()});
     $('#f-first').onchange=()=>{st.first=$('#f-first').value.slice(0,7);st.firstManual=true;cuoHint()};
@@ -1624,6 +1640,7 @@ const ACT={
   newCard:()=>openCardSheet(null),
   editCard:d=>{const c=cardById(d.id);c?openCardSheet(c):openCardSheet(null,{id:d.id})},
   cardDue:d=>openCardDueSheet(d.id),
+  cuotaInfo:d=>openCuotaInfo(d.acc,d.id,d.m||UI.month),
   payCard:d=>openPayCard(d.id,d.m||UI.month),
   newCuota:d=>openMovSheet(null,{kind:'variable',cuotas:true,card:d.id||''}),
   paid:async(d,btn)=>{const a=S.accounts[d.acc];const m=a?.movs[d.id];if(!m)return;const M=d.month||UI.month;const p=new Set(m.paid||[]);p.has(M)?p.delete(M):p.add(M);btn.setAttribute('aria-pressed',p.has(M));await write(()=>B.putMov(a,{...m,paid:[...p]}),p.has(M)?'Marcado como pagado':null)},

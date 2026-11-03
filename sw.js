@@ -1,8 +1,8 @@
 /* Chanchito service worker.
    Para publicar una versión nueva: cambiá VERSION (y anotá qué cambió en NOTES).
    Los usuarios ven "Hay una versión nueva" y la instalan con el botón Actualizar. */
-const VERSION = '1.4.3';
-const NOTES = 'En las compras en cuotas, la fecha de la primera cuota ahora se elige con el calendario, la que quieras. Además podés decir en qué cuota vas y poner cualquier cantidad de cuotas.';
+const VERSION = '1.4.4';
+const NOTES = 'Tocá una cuota en Tarjetas para ver su detalle: qué compraste, con qué tarjeta, en qué cuota vas y cuánto te queda. El selector de en qué cuota vas ahora se ve igual en la compu.';
 const CACHE = 'chanchito-' + VERSION;
 const FILES = [
   './', './index.html', './config.js', './js/backend.js', './manifest.webmanifest',
