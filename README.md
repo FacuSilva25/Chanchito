@@ -61,3 +61,15 @@ Si `config.js` queda vacío, la app igual funciona: no pide login y guarda los d
 - Los "Consejos personalizados" con IA no aparecen, porque necesitan una clave de API paga. Las recomendaciones automáticas del Informe siguen estando.
 - Las notificaciones de vencimientos llegan al abrir la app, una vez por día. Para que lleguen con la app cerrada hace falta un servidor de notificaciones push; se puede agregar más adelante.
 - Los datos que cargaste en la versión de claude.ai no se pasan solos. Si los querés, te los migro.
+
+## Pasar tus datos de una planilla (Excel o CSV)
+
+En **Configuración > Tus datos > Importar planilla (Excel o CSV)** elegís un `.xlsx` o `.csv` y la app te muestra qué encontró antes de importar.
+
+- Busca en cada pestaña una fila de títulos con **Fecha** y **Monto** (o Importe). También usa **Descripción** o **Concepto**, **Categoría**, **Subcategoría**, **Tipo** (Gasto, Ingreso o Fijo) y **Cuotas** / **Monto cuota**.
+- Una pestaña que se llama **Ingresos** se carga como ingresos. Una pestaña de **Tarjeta** reparte cada compra en cuotas, una por mes.
+- Una tabla con **Crédito**, **Valor cuota** y **Cuotas restantes** (o **Fecha finalización**) se carga como gasto fijo hasta la última cuota.
+- Las categorías que no existen en la app se crean solas. Si hay compras con tarjeta, los "Pago tarjeta" se saltean para no contar dos veces.
+- Importar el mismo archivo otra vez no duplica nada: solo suma las filas nuevas.
+
+Desde Google Sheets: **Archivo > Descargar > Microsoft Excel (.xlsx)**. En Configuración también hay una **planilla modelo** para descargar.
