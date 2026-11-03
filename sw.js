@@ -1,8 +1,8 @@
 /* Chanchito service worker.
    Para publicar una versión nueva: cambiá VERSION (y anotá qué cambió en NOTES).
    Los usuarios ven "Hay una versión nueva" y la instalan con el botón Actualizar. */
-const VERSION = '1.2.0';
-const NOTES = 'Ahora podés importar tu planilla de gastos (Excel o CSV) desde Configuración › Tus datos.';
+const VERSION = '1.3.0';
+const NOTES = 'Ahora se ven los centavos, podés cargar gastos en otras monedas (con la cotización del día) y al cambiar la moneda de la app se convierten tus datos.';
 const CACHE = 'chanchito-' + VERSION;
 const FILES = [
   './', './index.html', './config.js', './js/backend.js', './manifest.webmanifest',

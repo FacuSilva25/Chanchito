@@ -234,6 +234,8 @@ tr.cur td{font-weight:600}
 .amount .cur{font-family:var(--font-round);font-size:30px;font-weight:600;color:var(--label-2)}
 .amount input{font-family:var(--font-round);font-size:48px;font-weight:700;letter-spacing:-.03em;border:0;background:none;outline:none;width:100%;max-width:9ch;text-align:left;color:var(--label)}
 .amount input::placeholder{color:var(--label-3)}
+.fx-bar{display:flex;flex-direction:column;align-items:center;gap:6px;margin:-2px 0 4px;text-align:center}
+.fx-bar select{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:5px 12px;background:var(--fill);color:var(--label);max-width:100%}
 .group{background:var(--surface);border-radius:var(--r-md);overflow:hidden}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:0 14px}
 .row + .row{border-top:1px solid var(--sep)}
@@ -409,9 +411,9 @@ const CURRENCIES=['ARS','USD','EUR','UYU','CLP','MXN','BRL','PYG','COP','PEN','G
 const CUR_NAMES={ARS:'Peso argentino',USD:'Dólar estadounidense',EUR:'Euro',UYU:'Peso uruguayo',CLP:'Peso chileno',MXN:'Peso mexicano',BRL:'Real brasileño',PYG:'Guaraní',COP:'Peso colombiano',PEN:'Sol peruano',GBP:'Libra esterlina'};
 const cur=()=>S.settings.currency||'ARS';
 const NF={};
-function money(v,opt={}){const k=cur()+(opt.compact?'c':'')+(opt.sign?'s':'');
-  NF[k]=NF[k]||new Intl.NumberFormat('es-AR',{style:'currency',currency:cur(),maximumFractionDigits:opt.compact?1:0,notation:opt.compact?'compact':'standard',signDisplay:opt.sign?'exceptZero':'auto'});
-  return NF[k].format(Math.round((+v||0)*(opt.compact?1:1)))}
+function money(v,opt={}){v=+v||0;const cents=!opt.compact&&Math.abs(Math.round(v*100))%100!==0;const k=cur()+(opt.compact?'c':'')+(opt.sign?'s':'')+(cents?'d':'');
+  NF[k]=NF[k]||new Intl.NumberFormat('es-AR',{style:'currency',currency:cur(),minimumFractionDigits:cents?2:0,maximumFractionDigits:opt.compact?1:cents?2:0,notation:opt.compact?'compact':'standard',signDisplay:opt.sign?'exceptZero':'auto'});
+  return NF[k].format(opt.compact?v:Math.round(v*100)/100)}
 const curSymbol=()=>{try{return new Intl.NumberFormat('es-AR',{style:'currency',currency:cur()}).formatToParts(0).find(p=>p.type==='currency').value}catch(e){return '$'}};
 const pct=(v,d=0)=>(isFinite(v)?(v*100).toFixed(d):'0')+'%';
 function parseAmount(s){s=String(s||'').replace(/[^\d.,-]/g,'');if(!s)return NaN;
@@ -419,6 +421,59 @@ function parseAmount(s){s=String(s||'').replace(/[^\d.,-]/g,'');if(!s)return NaN
   else if((s.match(/\./g)||[]).length>1||/\.\d{3}$/.test(s))s=s.replace(/\./g,'');
   return parseFloat(s)}
 const plainNum=v=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(v);
+/* ---------- Monedas y cotizaciones ----------
+   Cada movimiento guarda su monto en la moneda de la app (amount + cur). Si se cargó en otra
+   moneda, fx = {cur, amount, rate, date, src} guarda el monto original y la cotización usada
+   ese día. Cotizaciones: dólar en Argentina de dolarapi.com (hoy) y argentinadatos.com (historia);
+   el resto de las monedas de fawazahmed0/currency-api (por fecha). Todo se pasa por el dólar. */
+const DOLAR_MODES={blue:'Blue',oficial:'Oficial',bolsa:'MEP',tarjeta:'Tarjeta'};
+const dolarMode=()=>DOLAR_MODES[S.settings.dolar]?S.settings.dolar:'blue';
+const round2=v=>Math.round((+v||0)*100)/100;
+const rateNum=r=>new Intl.NumberFormat('es-AR',{maximumFractionDigits:r<1?6:r<100?4:2}).format(r);
+function fmtCur(v,c){v=+v||0;const cents=Math.abs(Math.round(v*100))%100!==0;try{return new Intl.NumberFormat('es-AR',{style:'currency',currency:c,minimumFractionDigits:cents?2:0,maximumFractionDigits:cents?2:0}).format(round2(v))}catch(e){return c+' '+plainNum(v)}}
+const curSym=c=>{try{return new Intl.NumberFormat('es-AR',{style:'currency',currency:c}).formatToParts(0).find(p=>p.type==='currency').value}catch(e){return c}};
+const FX={cache:store('cc-fx')||{},pend:{},hist:{},fail:{}};
+const fxSave=()=>{try{const ks=Object.keys(FX.cache);if(ks.length>3000)ks.slice(0,ks.length-3000).forEach(k=>delete FX.cache[k]);store('cc-fx',FX.cache)}catch(e){}};
+const fxDay=d=>!d||d>TODAY_S?TODAY_S:d;
+// unidades de la moneda c por 1 dólar, el día d
+const usdKey=(c,d)=>c+'@'+d+(c==='ARS'?':'+dolarMode():'');
+function usdCached(c,d){if(c==='USD')return 1;const e=FX.cache[usdKey(c,fxDay(d))];if(!e)return null;if(e.t&&Date.now()-e.t>36e5)return null;return e.v}
+async function fxJSON(urls){let err;for(const u of urls){try{const r=await fetch(u,{cache:'no-store'});if(r.ok)return await r.json();err=new Error('HTTP '+r.status)}catch(e){err=e}}throw err}
+async function usdRate(c,d){d=fxDay(d);if(c==='USD')return 1;const hit=usdCached(c,d);if(hit!=null)return hit;
+  const k=usdKey(c,d);if(FX.pend[k])return FX.pend[k];
+  return FX.pend[k]=(async()=>{let v=null,today=d===TODAY_S;
+    if(c==='ARS'){const mode=dolarMode();
+      if(today){const j=await fxJSON(['https://dolarapi.com/v1/dolares/'+mode]);v=+j.venta}
+      else{try{if(FX.hist[mode]==='fail')throw 0;if(!FX.hist[mode])FX.hist[mode]=fxJSON(['https://api.argentinadatos.com/v1/cotizaciones/dolares/'+mode]);
+          const arr=await FX.hist[mode];let best=null;for(const x of arr)if(x.fecha<=d&&(!best||x.fecha>best.fecha))best=x;if(best&&d.slice(0,4)-best.fecha.slice(0,4)<1)v=+best.venta}
+        catch(e){FX.hist[mode]='fail'}
+        if(!(v>0)){const j=await fxJSON(['https://dolarapi.com/v1/dolares/'+mode]);v=+j.venta;today=true}}}
+    else{const lc=c.toLowerCase();const tag=today?'latest':d;
+      const get=t=>fxJSON(['https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@'+t+'/v1/currencies/usd.min.json','https://'+t+'.currency-api.pages.dev/v1/currencies/usd.min.json']);
+      let j;try{j=await get(tag)}catch(e){if(today)throw e;j=await get('latest');today=true}
+      v=+(j.usd&&j.usd[lc])}
+    if(!(v>0))throw new Error('Sin cotización para '+c);
+    FX.cache[k]=today?{v,t:Date.now()}:{v};fxSave();return v})().finally(()=>{delete FX.pend[k]})}
+// cuántas unidades de "to" vale 1 unidad de "from" el día d
+async function fxRate(from,to,d){if(from===to)return 1;const[a,b]=await Promise.all([usdRate(from,d),usdRate(to,d)]);return b/a}
+function fxGet(from,to,d){if(from===to)return 1;const a=usdCached(from,d),b=usdCached(to,d);return a&&b?b/a:null}
+function fxWant(from,to,d){const k=from+'>'+to+'@'+fxDay(d);if(FX.fail[k]||FX.pend['w'+k])return;
+  FX.pend['w'+k]=fxRate(from,to,d).then(()=>schedule()).catch(()=>{FX.fail[k]=1}).finally(()=>{delete FX.pend['w'+k]})}
+const fxSrc=(from,to)=>from==='ARS'||to==='ARS'?'Dólar '+DOLAR_MODES[dolarMode()].toLowerCase():'Mercado';
+// monto original de un movimiento: {cur, amount}
+const origOf=(m,base=cur())=>m.fx&&m.fx.cur?{cur:m.fx.cur,amount:+m.fx.amount||0}:{cur:m.cur||base,amount:+m.amount||0};
+// monto de un movimiento en la moneda de la app (los mensuales en otra moneda usan la cotización de cada mes)
+function amtIn(m,M){const base=cur(),stored=(m.cur||base)===base,o=origOf(m,base);
+  if(o.cur===base)return o.amount;
+  if(stored&&!(m.rec&&M&&m.fx))return +m.amount||0;
+  const d=fxDay(M?M+'-'+pad(dayFor(m,M)):m.date);const r=fxGet(o.cur,base,d);
+  if(r!=null)return round2(o.amount*r);
+  fxWant(o.cur,base,d);
+  if(stored)return +m.amount||0;
+  const r2=m.cur?fxGet(m.cur,base,d):null;if(r2!=null)return round2((+m.amount||0)*r2);
+  if(m.cur)fxWant(m.cur,base,d);return +m.amount||0}
+function goalTarget(g){const base=cur();if(g.fx&&g.fx.cur===base)return +g.fx.amount||0;const c=g.cur||base;if(c===base)return +g.target||0;
+  const r=fxGet(c,base,TODAY_S);if(r!=null)return round2((+g.target||0)*r);fxWant(c,base,TODAY_S);return +g.target||0}
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 const col=c=>`var(--c-${c||'gray'})`;
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2400)}
@@ -471,15 +526,15 @@ const accs=()=>Object.values(S.accounts).sort((a,b)=>(a.scope===b.scope?0:a.scop
 const selAccs=()=>UI.acc==='all'?accs():accs().filter(a=>a.id===UI.acc);
 function occurs(m,M){if(!m.rec)return m.month===M;return m.month<=M&&(!m.end||M<=m.end)&&!(m.skip||[]).includes(M)}
 function dayFor(m,M){const d=+((m.kind==='fijo'&&m.due?m.due:m.date)||'').slice(8,10)||1;return Math.min(d,daysIn(M))}
-function occ(M,list=selAccs()){const out=[];for(const a of list)for(const m of Object.values(a.movs))if(occurs(m,M))out.push({...m,acc:a,day:dayFor(m,M),M});return out}
+function occ(M,list=selAccs()){const out=[];for(const a of list)for(const m of Object.values(a.movs))if(occurs(m,M))out.push({...m,amount:amtIn(m,M),acc:a,day:dayFor(m,M),M});return out}
 const isPaid=o=>(o.paid||[]).includes(o.M);
 const counted=o=>o.kind!=='fijo'||isPaid(o);
 function firstMonth(list=selAccs()){let f=null;for(const a of list)for(const m of Object.values(a.movs))if(m.month&&(!f||m.month<f))f=m.month;return f}
 function totals(list){const t={ingreso:0,fijo:0,variable:0,ahorro:0,fijoPend:0};list.forEach(o=>{if(!counted(o)){t.fijoPend+=(+o.amount||0);return}t[o.kind]=(t[o.kind]||0)+(+o.amount||0)});t.gastos=t.fijo+t.variable;t.disp=t.ingreso-t.gastos-t.ahorro;t.tasa=t.ingreso?t.ahorro/t.ingreso:0;return t}
 function timesUpTo(m,upto){if(!m.rec)return 1;if(m.month>upto)return 0;let n=0,M=m.month;const last=m.end&&m.end<upto?m.end:upto;while(M<=last){if(!(m.skip||[]).includes(M))n++;M=addM(M,1);if(n>600)break}return n}
-function goalSaved(a,g){let s=0;for(const m of Object.values(a.movs))if(m.kind==='ahorro'&&m.goal===g.id)s+=(+m.amount||0)*timesUpTo(m,NOW_M);return s}
-function savedTotal(list=selAccs(),upto=NOW_M){let s=0;for(const a of list)for(const m of Object.values(a.movs))if(m.kind==='ahorro')s+=(+m.amount||0)*timesUpTo(m,upto);return s}
-function allGoals(list=selAccs()){const out=[];for(const a of list)for(const g of Object.values(a.metas))out.push({...g,acc:a,saved:goalSaved(a,g)});return out.sort((x,y)=>(x.created||0)-(y.created||0))}
+function goalSaved(a,g){let s=0;for(const m of Object.values(a.movs))if(m.kind==='ahorro'&&m.goal===g.id)s+=amtIn(m)*timesUpTo(m,NOW_M);return s}
+function savedTotal(list=selAccs(),upto=NOW_M){let s=0;for(const a of list)for(const m of Object.values(a.movs))if(m.kind==='ahorro')s+=amtIn(m)*timesUpTo(m,upto);return s}
+function allGoals(list=selAccs()){const out=[];for(const a of list)for(const g of Object.values(a.metas))out.push({...g,target:goalTarget(g),acc:a,saved:goalSaved(a,g)});return out.sort((x,y)=>(x.created||0)-(y.created||0))}
 const NOTIF_DEF={on:true,days:3};
 const notifCfg=()=>({...NOTIF_DEF,...(S.settings.notif||{})});
 const LEADS=[0,1,2,3,5,7,10,15];
@@ -602,7 +657,7 @@ function sampleData(withShared){
 }
 async function loadSampleIntoDb(){
   const d=sampleData(false);const a={...d.accounts['ej-personal'],id:newId(),scope:'p',created:Date.now()};
-  const ok=await write(async()=>{await B.putAccount(a);for(const g of Object.values(a.metas))await B.putMeta(a,g);for(const[id,m]of Object.entries(a.movs))await B.putMov(a,{...m,id});if(!S.settings.currency)await B.saveSettings({...S.settings,currency:'ARS'})},'Datos de ejemplo cargados');
+  const ok=await write(async()=>{await B.putAccount(a);const t=S.accounts[a.id]||a;for(const g of Object.values(a.metas))await B.putMeta(t,g);for(const[id,m]of Object.entries(a.movs))await B.putMov(t,{...m,id});if(!S.settings.currency)await B.saveSettings({...S.settings,currency:'ARS'})},'Datos de ejemplo cargados');
 }
 
 /* ---------- Profiles ---------- */
@@ -671,6 +726,7 @@ function movRow(o,opts={}){
   if(opts.showDate)bits.push(o.day+' '+mLabel(UI.month,'short'));
   bits.push(o.kind==='ahorro'?(o.amount<0?'Retiro de ahorro':'Ahorro'):esc(catInfo(o.cat,o.catName).name));
   if(UI.acc==='all'&&accs().length>1)bits.push(esc(o.acc.name));
+  {const oc=origOf(o);if(oc.cur!==cur())bits.push(esc(fmtCur(Math.abs(oc.amount),oc.cur)))}
   const by=o.acc.scope==='s'&&o.by&&PROF[o.by]?`<img class="av" src="${esc(PROF[o.by].avatarUrl)}" alt=""> ${esc(pname(o.by))} · `:'';
   return `<button class="li" data-act="editMov" data-acc="${o.acc.id}" data-id="${o.id}">
     <span class="li-ic" style="background:${col(ci.color)}">${icon(ci.icon)}</span>
@@ -999,14 +1055,19 @@ function openMovSheet(mov,preset={}){
   const defAcc=preset.acc||(UI.acc!=='all'?UI.acc:list[0].id);
   const m=mov?{...mov,date:mov.rec?UI.month+'-'+pad(+(mov.date||'').slice(8,10)||1):mov.date,due:mov.due?(mov.rec?UI.month+'-'+pad(mov.day):mov.due):(mov.rec?UI.month+'-'+pad(mov.day):mov.date)}:{kind:preset.kind||'variable',amount:'',desc:preset.desc||'',cat:preset.cat||'',date:defDate(),due:defDate(),rec:preset.rec??(preset.kind==='fijo'||preset.kind==='ingreso'),goal:preset.goal||''};
   const st={kind:m.kind,cat:m.cat||(m.kind==='ingreso'?'sueldo':''),sign:preset.sign||(m.kind==='ahorro'&&m.amount<0?-1:1),goal:m.goal||'',acc:mov?mov.acc.id:defAcc};
+  const base=cur();const o0=mov?origOf(mov,base):{cur:base,amount:0};
+  st.cur=o0.cur;st.rate=null;st.rateFor='';st.rateManual=false;
+  if(mov&&mov.fx&&mov.fx.cur===st.cur&&(mov.cur||base)===base&&mov.fx.rate>0){st.rate=+mov.fx.rate;st.rateFor=st.cur+mov.fx.date;st.rateManual=mov.fx.src==='Manual'}
   const recHint=isEdit&&mov.rec&&UI.month>mov.month?`<div class="hint">Es un movimiento mensual: los cambios aplican desde ${mLabel(UI.month,'month').toLowerCase()} en adelante.</div>`:'';
   const body=`
     <div class="seg" id="f-kind">${['variable','fijo','ingreso','ahorro'].map(k=>`<button type="button" data-k="${k}" aria-pressed="${k===st.kind}">${KINDS[k].short}</button>`).join('')}</div>
-    <label class="amount"><span class="cur">${esc(curSymbol())}</span><input id="f-amount" inputmode="decimal" placeholder="0" autocomplete="off" aria-label="Monto" data-autofocus value="${m.amount?plainNum(Math.abs(m.amount)):''}"></label>
+    <label class="amount"><span class="cur" id="f-sym">${esc(curSym(st.cur))}</span><input id="f-amount" inputmode="decimal" placeholder="0" autocomplete="off" aria-label="Monto" data-autofocus value="${mov&&o0.amount?plainNum(Math.abs(o0.amount)):''}"></label>
+    <div class="fx-bar"><select id="f-cur" aria-label="Moneda del monto">${CURRENCIES.map(c=>`<option value="${c}" ${c===st.cur?'selected':''}>${c} · ${esc(CUR_NAMES[c])}</option>`).join('')}</select><span id="f-fx" class="muted small"></span></div>
     <div id="f-extra"></div>
     <div><div class="group">
       <label class="row"><span>Descripción</span><input id="f-desc" value="${esc(m.desc)}" placeholder="Opcional" maxlength="80"></label>
       <label class="row"><span>Fecha</span><input id="f-date" type="date" value="${m.date}"></label>
+      <label class="row" id="row-rate" hidden><span id="f-rate-l">Cotización</span><input id="f-rate" inputmode="decimal" placeholder="0" autocomplete="off" value="${st.rate?rateNum(st.rate):''}"></label>
       <label class="row" id="row-due" ${st.kind==='fijo'?'':'hidden'}><span>Fecha de vencimiento</span><input id="f-due" type="date" value="${m.due||m.date}"></label>
       <label class="row"><span>Cuenta</span><select id="f-acc">${list.map(a=>`<option value="${a.id}" ${a.id===st.acc?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
       <label class="row"><span>Se repite todos los meses</span><input id="f-rec" type="checkbox" class="switch" ${m.rec?'checked':''}></label>
@@ -1030,6 +1091,22 @@ function openMovSheet(mov,preset={}){
   bindSeg($('#f-kind'),k=>{st.kind=k;$('#row-notif').hidden=k!=='fijo';$('#row-due').hidden=k!=='fijo';if(!isEdit)$('#f-rec').checked=(k==='fijo'||k==='ingreso');extra()});
   $('#f-acc').onchange=()=>{if(st.kind==='ahorro'){st.goal='';extra()}};
   $('#f-amount').addEventListener('keydown',e=>{if(e.key==='Enter')doSave()});
+  const fxD=()=>fxDay($('#f-date').value||defDate());
+  const fxHint=()=>{const c=st.cur,el=$('#f-fx');if(!el)return;if(c===base){el.textContent='';return}
+    const r=parseAmount($('#f-rate').value),a=parseAmount($('#f-amount').value);
+    el.textContent=r>0?(a>0?'≈ '+money(a*r)+' · ':'')+(st.rateManual?'Cotización a mano':fxSrc(c,base)+' del '+fxD().split('-').reverse().join('/')):'Poné la cotización'};
+  const fxUpd=async()=>{const c=$('#f-cur').value;st.cur=c;$('#f-sym').textContent=curSym(c);
+    $('#row-rate').hidden=c===base;if(c===base){fxHint();return}
+    $('#f-rate-l').textContent=`1 ${c} = ? ${base}`;
+    const d=fxD();if(!st.rateManual&&st.rateFor!==c+d){$('#f-fx').textContent='Buscando la cotización…';
+      try{const r=await fxRate(c,base,d);if(st.cur!==c||fxD()!==d)return;st.rate=r;st.rateFor=c+d;$('#f-rate').value=rateNum(r)}
+      catch(e){if(st.cur===c)$('#f-fx').textContent='No pude traer la cotización. Escribila a mano.';return}}
+    fxHint()};
+  $('#f-cur').onchange=()=>{st.rateManual=false;fxUpd()};
+  $('#f-date').addEventListener('change',()=>{if(!st.rateManual)fxUpd()});
+  $('#f-rate').addEventListener('input',()=>{st.rateManual=true;fxHint()});
+  $('#f-amount').addEventListener('input',fxHint);
+  fxUpd();
   async function save(){
     const amt=parseAmount($('#f-amount').value);
     if(!(amt>0)){shake($('.amount'));toast('Ingresá un monto');return false}
@@ -1041,7 +1118,10 @@ function openMovSheet(mov,preset={}){
     const due=st.kind==='fijo'?($('#f-due').value||date):null;
     if(due&&due.slice(0,7)<date.slice(0,7)&&!(isEdit&&mov.rec)){shake($('#row-due'));toast('El vencimiento no puede ser antes del mes de la fecha');return false}
     const nv=$('#f-notif').value;const notif=st.kind!=='fijo'||nv==='def'?null:nv==='off'?{off:true}:{days:+nv};
-    const body={kind:st.kind,amount:st.kind==='ahorro'?amt*st.sign:amt,notif,desc,cat,catName:ci.name,date,due,month:(due&&due>date?due:date).slice(0,7),rec,goal:st.kind==='ahorro'?(st.goal||null):null,end:null,skip:[],paid:[],by:mov?.by||ME.uid||null,created:mov?.created||Date.now()};
+    let fx=null,amtB=round2(amt);
+    if(st.cur!==base){const r=parseAmount($('#f-rate').value);if(!(r>0)){shake($('#row-rate'));toast('Poné la cotización');return false}
+      fx={cur:st.cur,amount:round2(amt)*(st.kind==='ahorro'?st.sign:1),rate:r,date:fxD(),src:st.rateManual?'Manual':fxSrc(st.cur,base)};amtB=round2(amt*r)}
+    const body={kind:st.kind,amount:st.kind==='ahorro'?amtB*st.sign:amtB,cur:base,fx,notif,desc,cat,catName:ci.name,date,due,month:(due&&due>date?due:date).slice(0,7),rec,goal:st.kind==='ahorro'?(st.goal||null):null,end:null,skip:[],paid:[],by:mov?.by||ME.uid||null,created:mov?.created||Date.now()};
     return write(async()=>{
       if(!isEdit){await B.putMov(a,{...body,id:newId()});return}
       const old=S.accounts[mov.acc.id].movs[mov.id];
@@ -1109,7 +1189,7 @@ function openGoalSheet(g){
     if(!name){shake($('#g-name').closest('.row'));toast('Poné un nombre');return false}
     if(!(target>0)){shake($('#g-target').closest('.row'));toast('Poné un monto objetivo');return false}
     const a=S.accounts[isEdit?g.acc.id:$('#g-acc').value];
-    return write(()=>B.putMeta(a,{id:g?.id||newId(),name,target,deadline:$('#g-deadline').value||null,color:st.color,icon:st.icon,created:g?.created||Date.now()}),isEdit?'Meta actualizada':'Meta creada')}});
+    return write(()=>B.putMeta(a,{id:g?.id||newId(),name,target:round2(target),cur:cur(),fx:null,deadline:$('#g-deadline').value||null,color:st.color,icon:st.icon,created:g?.created||Date.now()}),isEdit?'Meta actualizada':'Meta creada')}});
   const root=$('#sheet-root');bindChips(root,'icon',v=>st.icon=v);bindChips(root,'color',v=>st.color=v);
   root.querySelector('#g-del')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>B.delMeta(g.acc,g.id),'Meta eliminada. Lo aportado queda como ahorro libre.'))closeSheet()}));
 }
@@ -1134,10 +1214,48 @@ function openAccountSheet(a,forceShared){
   root.querySelector('#a-leave')?.addEventListener('click',e=>confirmBtn(e.currentTarget,async()=>{if(await write(()=>accRef(a).update({members:(a.members||[]).filter(x=>x!==ME.uid)}),'Saliste de la cuenta'))closeSheet()}));
 }
 function openCurrencySheet(){
-  openSheet({title:'Moneda',body:`<p class="muted" style="margin:0">Elegí en qué moneda querés ver y cargar tus montos. Cambiarla no convierte los importes ya cargados.</p>
-    <div class="group" id="cur-list">${CURRENCIES.map(c=>`<button class="row" style="width:100%" data-c="${c}"><span style="display:flex;flex-direction:column;align-items:flex-start;padding:8px 0"><span>${CUR_NAMES[c]}</span><span class="muted small">${c} · ${new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:0}).format(1500)}</span></span>${c===cur()?`<span style="color:var(--accent)">${icon('check')}</span>`:''}</button>`).join('')}</div>`});
-  $('#cur-list').onclick=async e=>{const b=e.target.closest('[data-c]');if(!b)return;NFreset();if(await write(()=>B.saveSettings({...S.settings,currency:b.dataset.c}),'Moneda: '+CUR_NAMES[b.dataset.c]))closeSheet()};
+  const dm=dolarMode();
+  openSheet({title:'Moneda',body:`<p class="muted" style="margin:0">Elegí en qué moneda querés ver tus montos. Si cambiás, la app te ofrece convertir lo que ya cargaste con la cotización de la fecha de cada movimiento.</p>
+    <div class="group" id="cur-list">${CURRENCIES.map(c=>`<button class="row" style="width:100%" data-c="${c}"><span style="display:flex;flex-direction:column;align-items:flex-start;padding:8px 0"><span>${CUR_NAMES[c]}</span><span class="muted small">${c} · ${new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:0}).format(1500)}</span></span>${c===cur()?`<span style="color:var(--accent)">${icon('check')}</span>`:''}</button>`).join('')}</div>
+    <div><div class="g-label">Dólar para convertir pesos</div><div class="seg" id="cur-dolar">${Object.entries(DOLAR_MODES).map(([k,n])=>`<button type="button" data-k="${k}" aria-pressed="${k===dm}">${n}</button>`).join('')}</div>
+    <div class="hint">Se usa cuando cargás un gasto en otra moneda y tu moneda es pesos argentinos (o al revés). Lo ya cargado no cambia.</div></div>`});
+  bindSeg($('#cur-dolar'),k=>write(()=>B.saveSettings({...S.settings,dolar:k}),'Dólar '+DOLAR_MODES[k].toLowerCase()));
+  $('#cur-list').onclick=e=>{const b=e.target.closest('[data-c]');if(!b)return;const to=b.dataset.c;if(to===cur()){closeSheet();return}openCurrencyConvertSheet(to)};
 }
+function countData(){let n=0;for(const a of accs())n+=Object.keys(a.movs).length+Object.keys(a.metas).length;return n}
+function openCurrencyConvertSheet(to){const from=cur();const n=countData();
+  if(!n){NFreset();write(()=>B.saveSettings({...S.settings,currency:to}),'Moneda: '+CUR_NAMES[to]).then(ok=>ok&&closeSheet());return}
+  const shared=accs().some(a=>a.scope==='s');
+  openSheet({title:'Cambiar a '+CUR_NAMES[to],saveLabel:'Convertir',body:`<p style="margin:0">Vas a pasar de <b>${esc(CUR_NAMES[from])}</b> a <b>${esc(CUR_NAMES[to])}</b>. Convierto tus ${n} movimientos y metas con la cotización del día de cada uno${from==='ARS'||to==='ARS'?` (dólar ${DOLAR_MODES[dolarMode()].toLowerCase()})`:''}.</p>
+    <div class="hint">El monto original queda guardado, así que si volvés a ${esc(from)} recuperás los números exactos.${shared?' Las cuentas compartidas también se convierten; la otra persona las sigue viendo en su moneda.':''}</div>
+    <p class="muted small" id="cv-status" style="margin:0"></p>
+    <button class="link small" id="cv-relabel" type="button">Solo cambiar el símbolo, sin convertir los montos</button>`,
+    onSave:async()=>{const st=$('#cv-status');const ok=await convertAll(from,to,t=>{if(st)st.textContent=t});if(ok){NFreset();toast('Listo, todo en '+CUR_NAMES[to]);render()}return ok}});
+  $('#cv-relabel').onclick=e=>confirmBtn(e.currentTarget,async()=>{NFreset();if(await write(()=>relabelAll(to),'Moneda: '+CUR_NAMES[to]))closeSheet()},'Los números quedan iguales. Tocá de nuevo para confirmar');
+}
+async function relabelAll(to){for(const a of accs()){for(const m of Object.values(a.movs))if(m.cur&&m.cur!==to)await B.putMov(a,{...m,cur:to,fx:m.fx&&m.fx.cur===to?null:m.fx});
+  for(const g of Object.values(a.metas))if(g.cur&&g.cur!==to)await B.putMeta(a,{...g,cur:to,fx:null})}
+  await B.saveSettings({...S.settings,currency:to})}
+async function convertAll(from,to,say){if(ME.readOnly){toast('Tenés acceso de solo lectura');return false}
+  const jobs=[];const need=new Map();
+  for(const a of accs()){
+    for(const m of Object.values(a.movs)){const o=origOf(m,from);const d=fxDay(m.date);jobs.push({a,m,o,d,meta:false});if(o.cur!==to)need.set(o.cur+'|'+d,[o.cur,d])}
+    for(const g of Object.values(a.metas)){const o=g.fx&&g.fx.cur?{cur:g.fx.cur,amount:+g.fx.amount||0}:{cur:g.cur||from,amount:+g.target||0};jobs.push({a,m:g,o,d:TODAY_S,meta:true});if(o.cur!==to)need.set(o.cur+'|'+TODAY_S,[o.cur,TODAY_S])}}
+  const hm=S.settings.hormigaMax;if(hm)need.set(from+'|'+TODAY_S,[from,TODAY_S]);
+  // 1) traer todas las cotizaciones antes de tocar nada
+  const R={};const list=[...need.values()];let done=0,fail=null;
+  say('Buscando cotizaciones…');
+  const worker=async()=>{while(list.length&&!fail){const[c,d]=list.shift();try{R[c+'|'+d]=await fxRate(c,to,d)}catch(e){fail=c+' del '+d.split('-').reverse().join('/')}done++;say(`Buscando cotizaciones… ${done}/${need.size}`)}};
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  if(fail){say('');toast('No pude traer la cotización de '+fail+'. Revisá la conexión y probá de nuevo.');return false}
+  // 2) guardar
+  return write(async()=>{let i=0;const src=fxSrc(from,to);
+    for(const j of jobs){i++;if(i%10===0)say(`Convirtiendo… ${i}/${jobs.length}`);
+      const{a,m,o,d}=j;let amount,fx;
+      if(o.cur===to){amount=o.amount;fx=null}else{const r=R[o.cur+'|'+d];amount=round2(o.amount*r);fx={cur:o.cur,amount:o.amount,rate:r,date:d,src:o.cur==='ARS'||to==='ARS'?fxSrc(o.cur,to):'Mercado'}}
+      if(j.meta)await B.putMeta(a,{...m,target:amount,cur:to,fx});else await B.putMov(a,{...m,amount,cur:to,fx})}
+    const ns={...S.settings,currency:to};if(hm)ns.hormigaMax=round2(hm*R[from+'|'+TODAY_S]);
+    await B.saveSettings(ns)},null)}
 function openNotifSheet(){
   const c=notifCfg();const up=upcoming();
   const fijos=[];for(const a of accs())for(const m of Object.values(a.movs))if(m.kind==='fijo'&&(m.rec?(!m.end||m.end>=NOW_M):m.month>=NOW_M))fijos.push({...m,acc:a,day:dayFor(m,NOW_M)});
@@ -1196,7 +1314,7 @@ function openCatSheet(){
   const root=$('#sheet-root');bindChips(root,'icon',v=>st.icon=v);bindChips(root,'color',v=>st.color=v);
 }
 function findMov(accId,id){const a=S.accounts[accId];const m=a?.movs[id];if(!m)return null;return {...m,acc:a,day:dayFor(m,UI.month)}}
-function findGoal(accId,id){const a=S.accounts[accId];const g=a?.metas[id];if(!g)return null;return {...g,acc:a,saved:goalSaved(a,g)}}
+function findGoal(accId,id){const a=S.accounts[accId];const g=a?.metas[id];if(!g)return null;return {...g,target:goalTarget(g),acc:a,saved:goalSaved(a,g)}}
 
 /* ---------- Actions ---------- */
 const ACT={

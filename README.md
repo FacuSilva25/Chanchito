@@ -73,3 +73,12 @@ En **Configuración > Tus datos > Importar planilla (Excel o CSV)** elegís un `
 - Importar el mismo archivo otra vez no duplica nada: solo suma las filas nuevas.
 
 Desde Google Sheets: **Archivo > Descargar > Microsoft Excel (.xlsx)**. En Configuración también hay una **planilla modelo** para descargar.
+
+## Centavos y otras monedas
+
+- Los montos se guardan y se muestran con centavos (si un número es redondo, se ve sin decimales).
+- Al cargar un movimiento podés elegir la moneda debajo del monto. La app busca la cotización de la fecha del movimiento y guarda el monto convertido, el original y la cotización usada. Si no hay conexión, la escribís a mano.
+- Los gastos mensuales en otra moneda (por ejemplo, una suscripción en dólares) se recalculan cada mes con la cotización de ese mes.
+- En **Moneda** elegís qué dólar se usa para los pesos: Blue (por defecto), Oficial, MEP o Tarjeta.
+- Si cambiás la moneda de la app, te ofrece convertir todos tus movimientos y metas con la cotización del día de cada uno. Como el monto original queda guardado, volver a la moneda anterior recupera los números exactos. También podés cambiar solo el símbolo, sin convertir.
+- Cotizaciones: [dolarapi.com](https://dolarapi.com) (dólar hoy), [argentinadatos.com](https://argentinadatos.com) (historia del dólar) y [currency-api](https://github.com/fawazahmed0/exchange-api) (el resto de las monedas). Son gratis y no necesitan clave.
