@@ -180,6 +180,8 @@ rep("  closeSheet:()=>closeSheet(),\n};", """  closeSheet:()=>closeSheet(),
   noAuth:()=>{store('cc-noauth',true);location.reload()},
   authTab:d=>{AUTH.tab=d.k;AUTH.err='';AUTH.ok='';render()},
   forgot:()=>forgotPassword(),
+  importData:()=>pickBackup(),
+  exportData:()=>exportBackup(),
 };""")
 rep("{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h))UI.tab=h}",
     "{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)||h==='config')UI.tab=h}")

@@ -1244,6 +1244,8 @@ const ACT={
   noAuth:()=>{store('cc-noauth',true);location.reload()},
   authTab:d=>{AUTH.tab=d.k;AUTH.err='';AUTH.ok='';render()},
   forgot:()=>forgotPassword(),
+  importData:()=>pickBackup(),
+  exportData:()=>exportBackup(),
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const f=ACT[b.dataset.act];if(f){e.preventDefault();f(b.dataset,b,e)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet-root').hidden)closeSheet()});
@@ -1420,11 +1422,42 @@ function viewConfig(){
     ${UPD.installEvt||(isIOS()&&!isStandalone()&&location.protocol.startsWith('http'))?`<section><div class="g-label">Instalar</div><div class="group">
       ${UPD.installEvt?`<div class="row" style="padding-block:10px"><span>Instalar Chanchito en este dispositivo</span><button class="btn sm secondary" data-act="install">Instalar</button></div>`
         :'<div class="row" style="padding-block:10px;white-space:normal"><span style="flex:1;white-space:normal">En iPhone: tocá Compartir y después <b>Agregar a inicio</b>.</span></div>'}</div></section>`:''}
+    <section><div class="g-label">Tus datos</div><div class="group">
+      <button class="row tap" data-act="importData"><span>Importar respaldo</span><span class="val" style="display:flex;align-items:center;gap:4px">Elegir archivo${icon('right').replace('class="i"','class="i" style="width:14px;height:14px"')}</span></button>
+      <button class="row tap" data-act="exportData"><span>Descargar respaldo</span><span class="val" style="display:flex;align-items:center;gap:4px">${icon('download').replace('class="i"','class="i" style="width:16px;height:16px"')}</span></button>
+    </div><div class="hint">Importar suma los movimientos del archivo a tu cuenta. Si importás el mismo archivo dos veces, no se duplica.</div></section>
     <section><div class="g-label">Preferencias</div><div class="group">
       <button class="row tap" data-act="currency"><span>Moneda</span><span class="val">${CUR_NAMES[cur()]||cur()} (${cur()})</span></button>
       <button class="row tap" data-act="editCats"><span>Categorías</span><span class="val" style="display:flex;align-items:center;gap:4px">${expCats().length+catsFor('inc').length}${icon('right').replace('class="i"','class="i" style="width:14px;height:14px"')}</span></button>
     </div></section>
   </div>`}
+
+/* Respaldo: exportar e importar datos */
+function exportBackup(){
+  const out={app:'chanchito',version:1,exported:TODAY_S,settings:S.settings,accounts:{}};
+  for(const a of accs())out.accounts[a.id]={name:a.name,color:a.color,created:a.created,scope:a.scope,movs:a.movs,metas:a.metas};
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
+  const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download=`chanchito-respaldo-${TODAY_S}.json`;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
+  toast('Respaldo descargado');
+}
+function pickBackup(){const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=()=>{if(i.files[0])importBackup(i.files[0])};i.click()}
+async function importBackup(file){
+  let d;try{d=JSON.parse(await file.text())}catch(e){d=null}
+  if(!d||typeof d.accounts!=='object'){toast('Ese archivo no es un respaldo de Chanchito');return}
+  let nM=0,nA=0;
+  const ok=await write(async()=>{
+    if(d.settings&&typeof d.settings==='object')await B.saveSettings({...d.settings,...S.settings,expCats:S.settings.expCats||d.settings.expCats,incCats:S.settings.incCats||d.settings.incCats});
+    for(const[id,a]of Object.entries(d.accounts)){
+      if(!a||typeof a!=='object')continue;
+      const acc={id,name:String(a.name||'Cuenta'),color:a.color||'blue',created:a.created||Date.now(),scope:'p'};
+      if(!S.accounts[id]){await B.putAccount(acc);nA++}
+      const t=S.accounts[id]||{...acc,movs:{},metas:{}};
+      for(const[gid,g]of Object.entries(a.metas||{}))await B.putMeta(t,{...g,id:gid});
+      for(const[mid,m]of Object.entries(a.movs||{})){await B.putMov(t,{...m,id:mid,by:ME.uid||null});nM++}
+    }
+  });
+  if(ok){toast(`Listo: se importaron ${nM} movimientos${nA?' en '+nA+(nA===1?' cuenta':' cuentas'):''}`);UI.acc='all';schedule()}
+}
 
 initSW();
 if(BK&&BK.auth&&BK.auth.recovery)setTimeout(()=>{if(ME.mode==='db')openNewPasswordSheet(true)},1500);
