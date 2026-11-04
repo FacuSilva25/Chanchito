@@ -16,7 +16,9 @@
 <link rel="icon" href="icons/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script>/* Tema guardado en este dispositivo, antes de pintar para que no parpadee */
-try{var t=JSON.parse(localStorage.getItem('cc-theme'));if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+try{var t=JSON.parse(localStorage.getItem('cc-theme'));if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}
+/* Si está activado el ingreso con huella, tapar la app desde el primer cuadro */
+try{var l=JSON.parse(localStorage.getItem('cc-lock'));if(l&&l.id)document.documentElement.classList.add('locked')}catch(e){}</script>
 <style>
 /* Layout: iOS-style grouped surfaces; floating glass tab bar on phones, sidebar split view from 900px. */
 :root{
@@ -316,6 +318,21 @@ body.auth-mode .app{grid-template-columns:1fr}
 .auth .ok{color:var(--pos);font-size:14px;text-align:center;margin:0}
 .auth .links{display:flex;flex-direction:column;align-items:center;gap:10px}
 .link-plain{color:var(--accent);font-weight:500;font-size:15px}
+/* Bloqueo con huella */
+#lock{display:none}
+.locked #lock{display:flex;position:fixed;inset:0;z-index:200;background:var(--bg);align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px max(24px,env(safe-area-inset-bottom,0px))}
+.locked .app,.locked .tabbar,.locked .fab,.locked #sheet-root{visibility:hidden}
+.lock-in{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.lock-in .logo{width:84px;height:84px;border-radius:22px;box-shadow:var(--shadow)}
+.lock-in h1{margin:0}
+.lock-in .sub{margin:-6px 0 18px;color:var(--label-2)}
+.lock-fp{width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--accent);background:var(--fill);transition:transform .2s,opacity .2s}
+.lock-fp:active{transform:scale(.94)}
+.lock-fp svg{width:52px;height:52px}
+.lock-fp[disabled]{opacity:.55}
+.lock-in .btn{width:100%;margin-top:6px}
+.lock-in .err{color:var(--neg);font-size:14px;margin:0}
+.lock-in .link-plain{margin-top:8px}
 @media (min-width:900px){.only-narrow{display:none}}
 
 /* Tarjetas */
@@ -439,6 +456,7 @@ button.row:active,.side-link:not([aria-current]):active{background:var(--fill);t
 <button class="fab" data-act="newMov" aria-label="Nuevo movimiento"><span data-icon="plus"></span></button>
 <div id="sheet-root" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="lock" role="dialog" aria-modal="true" aria-label="Chanchito bloqueada"></div>
 
 <script src="config.js"></script>
 <script src="vendor/supabase.js"></script>
@@ -739,11 +757,12 @@ const BK=window.APP_BACKEND||null;
 const noAuth=()=>store('cc-noauth')===true;
 async function boot(){
   render();
+  if(lockCfg()){if(BK&&BK.configured&&!noAuth()){showLock();unlock()}else clearLock()}
   if(BK&&BK.configured&&!noAuth()){
     ME.backend='app';
     try{await BK.auth.init()}catch(e){console.error(e)}
     BK.auth.onChange(ev=>{if(ev==='PASSWORD_RECOVERY'){openNewPasswordSheet(true);return}if(ev==='USER_UPDATED'){schedule();return}location.reload()});
-    if(!BK.auth.session){ME.mode='auth';return render()}
+    if(!BK.auth.session){clearLock();ME.mode='auth';return render()}
     BK.auth.ensureProfile();
     [db,user]=await Promise.all([BK.use('db'),BK.use('user')]);
   }else if(window.claude&&window.claude.use){
@@ -1794,7 +1813,9 @@ const ACT={
   install:()=>doInstall(),
   editName:()=>openNameSheet(),
   changePw:()=>openNewPasswordSheet(false),
-  logout:(d,btn)=>confirmBtn(btn,async()=>{try{await BK.auth.signOut()}catch(e){}location.reload()},'Tocá de nuevo para cerrar sesión'),
+  logout:(d,btn)=>confirmBtn(btn,async()=>{clearLock();try{await BK.auth.signOut()}catch(e){}location.reload()},'Tocá de nuevo para cerrar sesión'),
+  unlock:()=>unlock(),
+  lockFallback:(d,btn)=>confirmBtn(btn,async()=>{clearLock();try{await BK.auth.signOut()}catch(e){}location.reload()},'Tocá de nuevo: cierra la sesión y entrás con tu contraseña'),
   goLogin:()=>{store('cc-noauth',false);location.reload()},
   noAuth:()=>{store('cc-noauth',true);location.reload()},
   authTab:d=>{AUTH.tab=d.k;AUTH.err='';AUTH.ok='';render()},
@@ -1807,7 +1828,7 @@ const ACT={
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const f=ACT[b.dataset.act];if(f){e.preventDefault();f(b.dataset,b,e)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet-root').hidden)closeSheet()});
 document.addEventListener('input',e=>{if(e.target.id==='q'){UI.q=e.target.value;const pos=e.target.selectionStart;render();const q=$('#q');if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch(_){}}}});
-document.addEventListener('change',e=>{if(e.target.id==='cfg-notif'){toggleNotif(e.target.checked,e.target);return}if(e.target.id==='cfg-days'){write(()=>B.saveSettings({...S.settings,notif:{...notifCfg(),days:+e.target.value}}),'Anticipación: '+leadLabel(+e.target.value).toLowerCase());return}if(e.target.id==='set-cur'){NFreset();write(()=>B.saveSettings({...S.settings,currency:e.target.value}),'Moneda actualizada')}});
+document.addEventListener('change',e=>{if(e.target.id==='cfg-notif'){toggleNotif(e.target.checked,e.target);return}if(e.target.id==='cfg-lock'){if(e.target.checked)enableLock(e.target);else{clearLock();toast('Ingreso con huella apagado');schedule()}return}if(e.target.id==='cfg-days'){write(()=>B.saveSettings({...S.settings,notif:{...notifCfg(),days:+e.target.value}}),'Anticipación: '+leadLabel(+e.target.value).toLowerCase());return}if(e.target.id==='set-cur'){NFreset();write(()=>B.saveSettings({...S.settings,currency:e.target.value}),'Moneda actualizada')}});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(UI.tab==='metricas')schedule()});
 new MutationObserver(()=>{if(UI.tab==='metricas')schedule()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 {const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)||h==='config')UI.tab=h}
@@ -1942,6 +1963,57 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();UPD.install
 window.addEventListener('appinstalled',()=>{UPD.installEvt=null;toast('¡Chanchito quedó instalada!','ok');schedule()});
 async function doInstall(){const e=UPD.installEvt;if(!e)return;UPD.installEvt=null;e.prompt();try{await e.userChoice}catch(_){}schedule()}
 
+/* Ingreso con huella (WebAuthn con el lector del celu). Es un bloqueo de este dispositivo:
+   la sesión de Supabase sigue igual y la huella nunca sale del celu. */
+const LOCK={supported:null,busy:false,err:'',hiddenAt:0};
+const FP_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.2 6.6A8.5 8.5 0 0 1 20.4 11"/><path d="M3.6 10.2a8.6 8.6 0 0 1 .6-1.9"/><path d="M20.5 14.2v-1"/><path d="M6.8 18.6c1-1.9 1.5-4 1.5-6.4a3.7 3.7 0 0 1 7.4 0v.6"/><path d="M15.5 16.2c-.3 1.8-.8 3.4-1.6 4.8"/><path d="M12 12.2c0 3.6-.9 6.7-2.6 9"/><path d="M4.2 15.6c.6-1.1.9-2.2.9-3.4a6.9 6.9 0 0 1 11.7-5"/><path d="M18.4 9.6c.4.8.6 1.7.6 2.6 0 2.6-.4 5-1.3 7.2"/></svg>';
+const b64u={to:b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),
+  from:s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((s.length+3)%4)),c=>c.charCodeAt(0))};
+const rndBytes=n=>crypto.getRandomValues(new Uint8Array(n));
+const lockCfg=()=>{const c=store('cc-lock');return c&&c.id?c:null};
+function clearLock(){try{localStorage.removeItem('cc-lock')}catch(e){}hideLock()}
+async function lockSupported(){
+  if(LOCK.supported!==null||LOCK.checking)return LOCK.supported;LOCK.checking=true;
+  try{LOCK.supported=!!(window.PublicKeyCredential&&window.isSecureContext&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())}catch(e){LOCK.supported=false}
+  schedule();return LOCK.supported}
+async function enableLock(el){
+  try{
+    const email=(BK&&BK.auth&&BK.auth.email)||'chanchito';
+    const cred=await navigator.credentials.create({publicKey:{challenge:rndBytes(32),rp:{name:'Chanchito'},
+      user:{id:rndBytes(16),name:email,displayName:ME.mode==='db'?myName():'Chanchito'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000,attestation:'none'}});
+    if(!cred)throw new Error('sin credencial');
+    store('cc-lock',{id:b64u.to(cred.rawId),at:Date.now()});
+    toast('Listo: la próxima vez que abras Chanchito te pide la huella','ok');
+  }catch(e){console.warn(e);if(el)el.checked=false;
+    toast(e&&e.name==='NotAllowedError'?'Se canceló. El ingreso con huella quedó apagado.':'Este celu no dejó registrar la huella. Fijate que tenga una huella o bloqueo de pantalla configurado.')}
+  schedule()}
+function drawLock(){const el=$('#lock');if(!el)return;
+  el.innerHTML=`<div class="lock-in"><img class="logo" src="icons/icon-192.png" alt=""><h1>Chanchito</h1><p class="sub">Tocá el sensor para entrar con tu huella.</p>
+    <button class="lock-fp" data-act="unlock" aria-label="Entrar con huella" ${LOCK.busy?'disabled':''}>${FP_SVG}</button>
+    <button class="btn" data-act="unlock" ${LOCK.busy?'disabled':''}>Entrar con huella</button>
+    ${LOCK.err?`<p class="err">${esc(LOCK.err)}</p>`:''}
+    <button class="link-plain" data-act="lockFallback">Entrar con mi contraseña</button></div>`}
+function showLock(){document.documentElement.classList.add('locked');drawLock()}
+function hideLock(){document.documentElement.classList.remove('locked');const el=$('#lock');if(el)el.innerHTML=''}
+async function unlock(){
+  const c=lockCfg();if(!c)return hideLock();
+  if(LOCK.busy)return;LOCK.busy=true;LOCK.err='';drawLock();
+  try{
+    const a=await navigator.credentials.get({publicKey:{challenge:rndBytes(32),allowCredentials:[{type:'public-key',id:b64u.from(c.id),transports:['internal']}],userVerification:'required',timeout:60000}});
+    const flags=a&&a.response&&a.response.authenticatorData?new Uint8Array(a.response.authenticatorData)[32]:0;
+    if(!a||b64u.to(a.rawId)!==c.id||!(flags&4))throw new Error('verificación incompleta');
+    LOCK.busy=false;hideLock();return;
+  }catch(e){console.warn(e);LOCK.err=e&&e.name==='NotAllowedError'?'':'No se pudo verificar la huella. Probá de nuevo.'}
+  LOCK.busy=false;if(document.documentElement.classList.contains('locked'))drawLock()}
+/* Si la app queda más de un minuto en segundo plano, se vuelve a bloquear */
+document.addEventListener('visibilitychange',()=>{
+  if(!lockCfg()||LOCK.busy)return;
+  if(document.visibilityState==='hidden'){LOCK.hiddenAt=Date.now();return}
+  if(LOCK.hiddenAt&&Date.now()-LOCK.hiddenAt>60000&&!document.documentElement.classList.contains('locked')){showLock();unlock()}
+  LOCK.hiddenAt=0});
+
 function viewConfig(){
   const c=notifCfg();const th=getTheme();const perm=notifPerm();
   const ini=n=>esc((n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase());
@@ -1965,6 +2037,9 @@ function viewConfig(){
   const updStatus=UPD.waiting?`<b style="color:var(--accent)">Hay una versión nueva${UPD.newVersion?' ('+esc(UPD.newVersion)+')':''}</b>${UPD.notes?'<br><span class="muted small">'+esc(UPD.notes)+'</span>':''}`:UPD.checking?'Buscando…':'Estás en la última versión que conocemos.';
   return `<div class="cfg">
     <section><div class="g-label">Cuenta</div>${cuenta}</section>
+    ${ME.backend==='app'&&ME.mode==='db'?(lockSupported(),LOCK.supported===null?'':`<section><div class="g-label">Seguridad</div><div class="group">
+      <label class="row"><span>Entrar con huella</span><input id="cfg-lock" type="checkbox" class="switch" ${lockCfg()?'checked':''} ${LOCK.supported?'':'disabled'}></label>
+    </div><div class="hint">${LOCK.supported?'Cuando abrís Chanchito en este dispositivo (o volvés después de un minuto) te pide la huella. Si el lector falla, podés usar el PIN o patrón del celu. Se activa en cada dispositivo por separado.':'Este dispositivo o navegador no tiene un lector de huella disponible para Chanchito. En Android, abrila con Chrome y fijate que tengas una huella configurada en Ajustes del celu.'}</div></section>`):''}
     <section><div class="g-label">Apariencia</div><div class="group"><div class="row" style="flex-wrap:wrap;padding-block:8px"><span>Tema</span>
       <div class="seg" role="group" aria-label="Tema">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([k,l])=>`<button data-act="theme" data-k="${k}" aria-pressed="${th===k}">${l}</button>`).join('')}</div></div></div>
       <div class="hint">Automático sigue el modo claro u oscuro de tu celu o compu.</div></section>
