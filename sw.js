@@ -1,8 +1,8 @@
 /* Chanchito service worker.
    Para publicar una versión nueva: cambiá VERSION (y anotá qué cambió en NOTES).
    Los usuarios ven "Hay una versión nueva" y la instalan con el botón Actualizar. */
-const VERSION = '1.5.0';
-const NOTES = 'Animaciones más fluidas: los botones responden al tocar, las hojas y el calendario se abren suave (y las hojas se cierran arrastrando hacia abajo), y al guardar ves un tilde de confirmación.';
+const VERSION = '1.6.0';
+const NOTES = 'Ahora podés entrar con tu huella: activalo en Configuración > Seguridad > Entrar con huella.';
 const CACHE = 'chanchito-' + VERSION;
 const FILES = [
   './', './index.html', './config.js', './js/backend.js', './manifest.webmanifest',

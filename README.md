@@ -40,6 +40,10 @@ Sirve cualquier hosting que use https: Netlify, Vercel, Cloudflare Pages, etc.
 - **PC (Chrome o Edge):** abrí el link y tocá el ícono de instalar en la barra de direcciones, o **Configuración > Instalar Chanchito** dentro de la app.
 - **iPhone (Safari):** Compartir > **Agregar a inicio**.
 
+## Entrar con huella
+
+En **Configuración > Seguridad > Entrar con huella** cada persona puede activar el desbloqueo con la huella (o el reconocimiento facial / PIN del celu). Usa el lector del propio dispositivo (WebAuthn), así que no hay que configurar nada en Supabase y la huella nunca sale del celu. Se activa en cada dispositivo por separado y la sesión con email y contraseña sigue igual: si el lector falla, "Entrar con mi contraseña" cierra la sesión para volver a ingresar.
+
 ## Publicar una versión nueva
 
 1. Cambiá lo que haga falta en `index.html` (u otros archivos).
