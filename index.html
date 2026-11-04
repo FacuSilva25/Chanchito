@@ -362,6 +362,63 @@ body.auth-mode .app{grid-template-columns:1fr}
 .cd-h{display:flex;align-items:center;gap:12px;padding:0 4px 10px}
 .stepper{display:inline-flex;align-items:center;gap:10px;margin-left:auto}
 .stepper b{min-width:64px;text-align:center;font-weight:600}
+
+/* Animaciones estilo iOS: feedback al tocar, hojas, calendario, confirmaciones */
+:root{--spring:cubic-bezier(.32,.72,0,1);--bounce:cubic-bezier(.34,1.56,.64,1)}
+html{-webkit-tap-highlight-color:transparent}
+button,a,label,.switch{touch-action:manipulation}
+.btn,.hbtn,.pill,.chip,.tab,.fab,.icon-btn,.eye-btn,.month button,.cal-h button,.cal-g button,.seg button,.check,.sw,.del-btn,button.tile,.new-card,button.card,.stepper button{transition:transform .5s var(--bounce),background-color .2s,color .2s,box-shadow .2s,opacity .2s,border-color .2s}
+button.li,.tj-lines>button,button.row,.side-link,.cal-g button{transition:transform .5s var(--bounce),background-color .35s,box-shadow .35s,color .2s}
+.link,.link-plain,.date-btn{transition:opacity .3s}
+.link:active,.link-plain:active,.date-btn:active{opacity:.4;transition-duration:0s}
+button.li:active,.tj-lines>button:active{background:var(--fill);box-shadow:0 0 0 6px var(--fill);border-radius:8px;transition-duration:0s}
+button.row:active,.side-link:not([aria-current]):active{background:var(--fill);transition-duration:0s}
+@media (prefers-reduced-motion:no-preference){
+  .btn:not(:disabled):active,.hbtn:active,.pill:active,.chip:active,.seg button:active,.del-btn:active{transform:scale(.95);transition-duration:.1s}
+  .tab:active,.icon-btn:not(:disabled):active,.eye-btn:active,.month button:not(:disabled):active,.cal-h button:active,.cal-g button:active,.check:active,.sw:active,.stepper button:active{transform:scale(.86);transition-duration:.1s}
+  .fab:active{transform:scale(.9);transition-duration:.1s}
+  button.tile:active,.new-card:active,button.card:active{transform:scale(.97);transition-duration:.12s}
+}
+.switch::after{transition:transform .4s var(--spring),width .25s var(--spring)}
+.switch:active::after{width:33px}
+.switch:checked:active::after{transform:translateX(14px)}
+/* Hojas: entran con el resorte de iOS y se pueden bajar arrastrando */
+.scrim{transition:opacity .4s}
+.sheet{transition:transform .5s var(--spring)}
+#sheet-root:not(.open) .sheet{transition-duration:.36s}
+#sheet-root.dragging .sheet,#sheet-root.dragging .scrim{transition:none}
+.grabber{position:relative}
+.grabber::before{content:"";position:absolute;inset:-12px -48px}
+@media (max-width:699px){.grabber,.sheet-head{touch-action:none}}
+@media (min-width:700px){
+  .sheet{transform:translate(-50%,-50%) scale(.92);opacity:0;transition:transform .45s var(--spring),opacity .25s}
+  #sheet-root.open .sheet{transform:translate(-50%,-50%) scale(1);opacity:1}
+  #sheet-root:not(.open) .sheet{transition-duration:.25s,.2s}
+}
+/* Confirmación al guardar: el botón se vuelve un tilde que se dibuja */
+@keyframes popIn{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes drawCheck{to{stroke-dashoffset:0}}
+#sheet-save.saved{color:var(--c-green);display:grid;place-items:center}
+#sheet-save.saved svg.i{width:26px;height:26px;stroke-width:2.6;animation:popIn .4s var(--bounce)}
+@media (prefers-reduced-motion:no-preference){#sheet-save.saved svg.i path,.toast .tic svg path,.check.pop svg path{stroke-dasharray:22;stroke-dashoffset:22;animation:drawCheck .32s ease-out .08s forwards}}
+.check.pop{animation:popIn .45s var(--bounce) var(--pd,0ms) both}
+.check.pop svg path{animation-delay:calc(var(--pd,0ms) + 80ms)!important}
+.cal-h b{display:inline-block}
+/* Avisos: bajan con rebote; los de éxito traen tilde */
+.toast{display:flex;align-items:center;justify-content:center;gap:8px;width:max-content;opacity:0;transform:translate(-50%,-140%) scale(.9);transition:transform .32s cubic-bezier(.4,0,1,1),opacity .3s,visibility 0s .32s}
+.toast.show{opacity:1;transform:translate(-50%,0) scale(1);transition:transform .55s var(--bounce),opacity .2s,visibility 0s}
+.toast .tic{width:20px;height:20px;border-radius:50%;background:var(--c-green);color:#fff;display:grid;place-items:center;flex:none;animation:popIn .4s var(--bounce) .05s both}
+.toast .tic svg.i{width:13px;height:13px;stroke-width:3.2}
+/* Cambio de pestaña y de mes */
+@keyframes viewIn{from{opacity:0;transform:translateY(10px)}}
+@keyframes viewNext{from{opacity:0;transform:translateX(20px)}}
+@keyframes viewPrev{from{opacity:0;transform:translateX(-20px)}}
+@keyframes titleIn{from{opacity:0;transform:translateY(4px)}}
+#view.in-tab{animation:viewIn .42s var(--spring)}
+#view.in-next{animation:viewNext .38s var(--spring)}
+#view.in-prev{animation:viewPrev .38s var(--spring)}
+.top h1.in-title{animation:titleIn .35s var(--spring)}
+@media (prefers-reduced-motion:reduce){.link:active,.link-plain:active,.date-btn:active{opacity:.4}}
 @media (max-width:420px){.tab{min-width:0;padding:6px 5px;font-size:10px}.tabbar-in{gap:0}}
 </style>
 </head>
@@ -445,6 +502,12 @@ document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.datase
 /* ---------- Helpers ---------- */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Animaciones: se apagan si el sistema pide reducir movimiento */
+const RM=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SPRING='cubic-bezier(.32,.72,0,1)';
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const haptic=(ms=10)=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+let POP=null;
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const pad=n=>String(n).padStart(2,'0');
 const ymOf=d=>d.getFullYear()+'-'+pad(d.getMonth()+1);
@@ -526,7 +589,8 @@ function goalTarget(g){const base=cur();if(g.fx&&g.fx.cur===base)return +g.fx.am
   const r=fxGet(c,base,TODAY_S);if(r!=null)return round2((+g.target||0)*r);fxWant(c,base,TODAY_S);return +g.target||0}
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 const col=c=>`var(--c-${c||'gray'})`;
-let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2400)}
+let toastT;function toast(t,kind){const el=$('#toast');const was=el.classList.contains('show');el.innerHTML=(kind==='ok'?`<span class="tic">${icon('check')}</span>`:'')+`<span>${esc(t)}</span>`;el.classList.add('show');
+  if(was&&el.animate&&!RM())el.animate([{transform:'translate(-50%,0) scale(1)'},{transform:'translate(-50%,0) scale(1.06)'},{transform:'translate(-50%,0) scale(1)'}],{duration:320,easing:'ease-out'});clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2400)}
 function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 
 /* ---------- Domain ---------- */
@@ -666,7 +730,7 @@ function cleanAcc(a){return {name:a.name,color:a.color||'blue',created:a.created
 function accRef(a){return a.scope==='s'?db.collection('compartidas').doc(a.id):rootRef.collection('cuentas').doc(a.id)}
 function saveLocal(){const out={settings:S.settings,accounts:{}};for(const a of accs())out.accounts[a.id]={...cleanAcc(a),scope:a.scope,movs:a.movs,metas:a.metas};store(LOCAL_KEY,out);schedule()}
 async function write(fn,okMsg){if(ME.readOnly){toast('Tenés acceso de solo lectura');return false}
-  try{await fn();if(okMsg)toast(okMsg);schedule();return true}
+  try{await fn();if(okMsg)toast(okMsg,'ok');schedule();return true}
   catch(e){console.error(e);if(e&&e.code==='invalid_argument'&&ME.mode==='db'){ME.readOnly=true;toast('No tenés permiso para guardar cambios acá')}
   else if(e&&e.code==='quota_exceeded')toast('Se llenó el espacio de datos. Borrá movimientos viejos.');else toast('No se pudo guardar. Probá de nuevo.');return false}}
 
@@ -762,6 +826,7 @@ function ensureProfiles(ids){if(!user||!user.profiles)return;const miss=[...new 
 const pname=id=>(PROF[id]&&PROF[id].isMe)?'Vos':(PROF[id]&&PROF[id].name)||'Alguien';
 
 /* ---------- Render ---------- */
+let lastView=null;
 let rq=false;function schedule(){if(rq)return;rq=true;requestAnimationFrame(()=>{rq=false;render()})}
 const TABS=[['resumen','Resumen','pie'],['movimientos','Movimientos','list'],['tarjetas','Tarjetas','card'],['ahorro','Ahorro y metas','target'],['metricas','Informe','chart'],['cuentas','Cuentas','people']];
 const isLoading=()=>ME.mode==='boot'||(ME.mode==='db'&&!(loaded.p&&loaded.s&&loaded.set));
@@ -779,9 +844,13 @@ function render(){
   if(isLoading()){v.innerHTML='<div style="display:flex;flex-direction:column;gap:16px"><div class="skel" style="height:190px"></div><div class="skel"></div></div>';return}
   if(!accs().length&&UI.tab!=='cuentas'&&UI.tab!=='config'){v.innerHTML=emptyState();return}
   destroyCharts();
+  const key=UI.tab+'|'+UI.month,prevKey=lastView;lastView=key;
   v.innerHTML=({resumen:viewResumen,movimientos:viewMovs,tarjetas:viewTarjetas,ahorro:viewAhorro,metricas:viewMetricas,cuentas:viewCuentas,config:viewConfig})[UI.tab]();
   maybeNotify();
   if(UI.tab==='metricas'&&UI.metView==='graficos')drawCharts();
+  replayPop();
+  if(prevKey&&prevKey!==key&&!RM()){const[t0,m0]=prevKey.split('|');const cls=t0!==UI.tab?'in-tab':UI.month>m0?'in-next':'in-prev';
+    v.classList.remove('in-tab','in-next','in-prev');void v.offsetWidth;v.classList.add(cls);if(t0!==UI.tab)$('#top h1')?.classList.add('in-title')}
 }
 function renderTop(){
   const titles={resumen:'Resumen',movimientos:'Movimientos',tarjetas:'Tarjetas',ahorro:'Ahorro y metas',metricas:'Informe del mes',cuentas:'Cuentas',config:'Configuración'};
@@ -1282,6 +1351,25 @@ function viewCuentas(){
   <div class="chips" style="padding:0 4px">${expCats().map(c=>`<span class="chip"><span class="ci" style="background:${col(c.color)}">${icon(c.icon)}</span>${esc(c.name)}</span>`).join('')}</div>
   ${list.length?`<p class="muted small" style="margin:0 4px">¿Querés ver cómo queda con datos? <button class="link small" data-act="loadSample">Cargar una cuenta de ejemplo</button> (después la podés borrar).</p>`:''}`}
 
+/* ---------- Animaciones (estilo iOS) ---------- */
+document.addEventListener('touchstart',()=>{},{passive:true}); // hace que :active funcione en Safari de iPhone
+const boxPad=el=>{const c=getComputedStyle(el);return {paddingTop:c.paddingTop,paddingBottom:c.paddingBottom}};
+function expandIn(el){if(RM()||!el.animate)return;const p=boxPad(el),h=el.offsetHeight;el.style.overflow='hidden';
+  el.animate([{height:'0px',paddingTop:'0px',paddingBottom:'0px',opacity:0},{height:h+'px',...p,opacity:1}],{duration:420,easing:SPRING}).onfinish=()=>{el.style.overflow=''}}
+function collapseOut(el){el.classList.add('cal-out');if(RM()||!el.animate){el.remove();return}el.style.overflow='hidden';el.style.pointerEvents='none';
+  el.animate([{height:el.offsetHeight+'px',...boxPad(el),opacity:1},{height:'0px',paddingTop:'0px',paddingBottom:'0px',opacity:0}],{duration:300,easing:SPRING,fill:'forwards'}).onfinish=()=>el.remove()}
+function resizeFrom(el,h0){if(RM()||!el.animate)return;const h1=el.offsetHeight;if(h0===h1)return;el.style.overflow='hidden';el.animate([{height:h0+'px'},{height:h1+'px'}],{duration:320,easing:SPRING}).onfinish=()=>{el.style.overflow=''}}
+function slideIn(el,dir){if(RM()||!el||!el.animate)return;el.animate([{transform:`translateX(${dir*28}px)`,opacity:0},{transform:'none',opacity:1}],{duration:340,easing:SPRING})}
+function replayPop(){if(!POP)return;const dt=performance.now()-POP.t;if(dt>500){POP=null;return}document.querySelectorAll(POP.sel).forEach(el=>{if(el.getAttribute('aria-pressed')==='true'){el.style.setProperty('--pd',-dt+'ms');el.classList.add('pop')}})}
+/* Arrastrar la hoja hacia abajo para cerrarla (en el celu) */
+function bindSheetDrag(r){const sh=r.querySelector('.sheet'),sc=r.querySelector('.scrim');if(!sh)return;let y0=null,dy=0,last=0,lt=0,v=0;
+  sh.addEventListener('pointerdown',e=>{if(innerWidth>=700||e.button>0||!e.target.closest('.grabber,.sheet-head')||e.target.closest('button,input,a,select,textarea'))return;
+    y0=last=e.clientY;lt=e.timeStamp;dy=0;v=0;r.classList.add('dragging');try{sh.setPointerCapture(e.pointerId)}catch(_){}});
+  sh.addEventListener('pointermove',e=>{if(y0==null)return;const d=e.clientY-y0;dy=d>0?d:d/6;v=(e.clientY-last)/Math.max(1,e.timeStamp-lt);last=e.clientY;lt=e.timeStamp;
+    sh.style.transform=`translateY(${dy}px)`;sc.style.opacity=String(Math.max(0,1-Math.max(0,dy)/sh.offsetHeight))});
+  const up=()=>{if(y0==null)return;y0=null;r.classList.remove('dragging');sh.style.transform='';sc.style.opacity='';if(dy>sh.offsetHeight*.3||(dy>30&&v>.5))closeSheet()};
+  sh.addEventListener('pointerup',up);sh.addEventListener('pointercancel',up)}
+
 /* ---------- Sheets ---------- */
 let sheetSave=null;
 function openSheet({title,body,onSave,saveLabel='Guardar',foot=''}){
@@ -1289,14 +1377,15 @@ function openSheet({title,body,onSave,saveLabel='Guardar',foot=''}){
   r.innerHTML=`<div class="scrim" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="grabber"></div>
   <div class="sheet-head"><button class="link" data-act="closeSheet">Cancelar</button><h2>${esc(title)}</h2>${onSave?`<button class="link strong" id="sheet-save">${saveLabel}</button>`:'<span></span>'}</div>
   <div class="sheet-body">${body}</div>${foot?`<div class="sheet-foot">${foot}</div>`:''}</div>`;
-  r.hidden=false;requestAnimationFrame(()=>requestAnimationFrame(()=>r.classList.add('open')));
+  r.hidden=false;bindSheetDrag(r);requestAnimationFrame(()=>requestAnimationFrame(()=>r.classList.add('open')));
   sheetSave=onSave||null;
   if(onSave)$('#sheet-save').onclick=doSave;
   const first=r.querySelector('[data-autofocus]');if(first&&matchMedia('(pointer:fine)').matches)setTimeout(()=>first.focus(),300);
 }
 let saving=false;
-async function doSave(){if(!sheetSave||saving)return;saving=true;try{const ok=await sheetSave();if(ok!==false)closeSheet()}finally{saving=false}}
-function closeSheet(){const r=$('#sheet-root');r.classList.remove('open');sheetSave=null;setTimeout(()=>{if(!r.classList.contains('open')){r.hidden=true;r.innerHTML=''}},300)}
+async function doSave(){if(!sheetSave||saving)return;saving=true;try{const ok=await sheetSave();if(ok!==false){haptic();const b=$('#sheet-save');
+  if(b&&!RM()){b.classList.add('saved');b.innerHTML=icon('check');b.setAttribute('aria-label','Guardado');await wait(420)}closeSheet()}}finally{saving=false}}
+function closeSheet(){const r=$('#sheet-root');r.classList.remove('open');sheetSave=null;setTimeout(()=>{if(!r.classList.contains('open')){r.hidden=true;r.innerHTML=''}},RM()?0:380)}
 function shake(el){el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake')}
 function confirmBtn(btn,fn,label='Tocá de nuevo para confirmar'){if(btn.dataset.armed){fn();return}btn.dataset.armed='1';const old=btn.textContent;btn.textContent=label;setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.textContent=old}},3500)}
 const chipsHTML=(cats,sel,name)=>`<div class="chips" data-chips="${name}">${cats.map(c=>`<button type="button" class="chip" data-v="${c.id}" aria-pressed="${c.id===sel}"><span class="ci" style="background:${col(c.color)}">${icon(c.icon)}</span>${esc(c.name)}</button>`).join('')}</div>`;
@@ -1306,8 +1395,8 @@ function bindChips(root,name,onPick){root.querySelector(`[data-chips="${name}"]`
 const fmtDMY=d=>d?d.split('-').reverse().join('/'):'';
 function dateField(id,val,{empty='Elegir',clear=false}={}){return `<button type="button" class="date-btn" data-date-for="${id}" ${clear?'data-clear="1"':''} data-empty="${esc(empty)}" aria-expanded="false"><span>${val?fmtDMY(val):esc(empty)}</span>${icon('calendar')}</button><input type="hidden" id="${id}" value="${val||''}">`}
 function setDate(id,v,silent){const i=document.getElementById(id);if(!i)return;i.value=v||'';const b=document.querySelector(`[data-date-for="${id}"]`);if(b)b.querySelector('span').textContent=v?fmtDMY(v):b.dataset.empty;if(!silent)i.dispatchEvent(new Event('change',{bubbles:true}))}
-function toggleCal(b){const row=b.closest('.row')||b;const wasOpen=row.nextElementSibling?.classList.contains('cal');
-  document.querySelectorAll('.cal').forEach(c=>c.remove());document.querySelectorAll('.date-btn[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false'));if(wasOpen)return;
+function toggleCal(b){const row=b.closest('.row')||b;const wasOpen=!!row.nextElementSibling?.matches('.cal:not(.cal-out)');
+  document.querySelectorAll('.cal:not(.cal-out)').forEach(c=>collapseOut(c));document.querySelectorAll('.date-btn[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false'));if(wasOpen)return;
   const id=b.dataset.dateFor;let view=(document.getElementById(id).value||TODAY_S).slice(0,7);
   const cal=document.createElement('div');cal.className='cal';row.after(cal);b.setAttribute('aria-expanded','true');
   const draw=()=>{const[y,m]=view.split('-').map(Number);const first=(new Date(y,m-1,1).getDay()+6)%7;const cur0=document.getElementById(id).value;
@@ -1315,9 +1404,9 @@ function toggleCal(b){const row=b.closest('.row')||b;const wasOpen=row.nextEleme
     <div class="cal-g">${['L','M','M','J','V','S','D'].map(d=>`<span class="wd">${d}</span>`).join('')}${'<span></span>'.repeat(first)}${[...Array(daysIn(view))].map((_,i)=>{const d=view+'-'+pad(i+1);return `<button type="button" data-cd="${d}" class="${d===TODAY_S?'today':''}" aria-pressed="${d===cur0}" aria-label="${fmtDMY(d)}">${i+1}</button>`}).join('')}</div>
     <div class="cal-f"><button type="button" class="link small" data-cd="${TODAY_S}">Hoy</button>${b.dataset.clear?'<button type="button" class="link small" data-cd="">Sin definir</button>':''}</div>`};
   cal.onclick=e=>{const x=e.target.closest('button');if(!x)return;e.preventDefault();e.stopPropagation();
-    if(x.dataset.cm){view=addM(view,+x.dataset.cm);draw();return}
-    if(x.dataset.cd!=null){setDate(id,x.dataset.cd);cal.remove();b.setAttribute('aria-expanded','false')}};
-  draw();setTimeout(()=>cal.scrollIntoView({block:'nearest',behavior:'smooth'}),30)}
+    if(x.dataset.cm){const h0=cal.offsetHeight;view=addM(view,+x.dataset.cm);draw();resizeFrom(cal,h0);slideIn(cal.querySelector('.cal-g'),+x.dataset.cm);slideIn(cal.querySelector('.cal-h b'),+x.dataset.cm);return}
+    if(x.dataset.cd!=null){setDate(id,x.dataset.cd);b.setAttribute('aria-expanded','false');cal.querySelectorAll('.cal-g [aria-pressed]').forEach(y=>y.setAttribute('aria-pressed',y===x));setTimeout(()=>collapseOut(cal),RM()?0:140)}};
+  draw();expandIn(cal);setTimeout(()=>cal.scrollIntoView({block:'nearest',behavior:RM()?'auto':'smooth'}),RM()?30:200)}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-date-for]');if(b){e.preventDefault();toggleCal(b)}});
 const accChips=(sel,name)=>`<div class="acc-chips">${chipsHTML(accs().map(a=>({id:a.id,name:a.name,color:a.color||'blue',icon:a.scope==='s'?'people':'wallet'})),sel,name)}</div>`;
 function bindSeg(el,onPick){el.addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));onPick(b.dataset.k)})}
@@ -1500,11 +1589,11 @@ function catPicker(el,k,get,set,opts={}){
     if(d.cp==='save'){const name=el.querySelector('#nc-name').value.trim();if(!name){shake(el.querySelector('.row'));toast('Poné un nombre');return}
       if(catsFor(k).some(c=>c.name.toLowerCase()===name.toLowerCase())){shake(el.querySelector('.row'));toast('Ya existe esa categoría');return}
       const c={id:'c-'+newId(),name,color:nc.color,icon:nc.icon,custom:true};
-      if(await saveCats(k,[...catsFor(k),c])){toast('Categoría agregada');if(sel)set(c.id);mode='pick';draw()}return}
+      if(await saveCats(k,[...catsFor(k),c])){toast('Categoría agregada','ok');if(sel)set(c.id);mode='pick';draw()}return}
     if(d.cp){mode=d.cp;draw();return}
     if(d.del){if(!d.armed){d.armed='1';b.classList.add('armed');b.textContent='Borrar';setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.classList.remove('armed');b.innerHTML=icon('minus')}},3500);return}
       const list=catsFor(k).filter(c=>c.id!==d.del);if(!list.length){toast('Tiene que quedar al menos una categoría');return}
-      if(await saveCats(k,list)){toast('Categoría eliminada');if(get()===d.del)set('');draw()}return}
+      if(await saveCats(k,list)){toast('Categoría eliminada','ok');if(get()===d.del)set('');draw()}return}
     if(d.mv!=null){const i=+d.mv,j=i+(+d.d);const list=[...catsFor(k)];if(j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]];if(await saveCats(k,list))draw()}};
   draw();
 }
@@ -1618,7 +1707,7 @@ function openShareSheet(id){
     <button class="btn secondary" id="sh-copy">Copiar código</button>
     <p class="muted small" style="margin:0">Las dos personas ven y cargan los mismos movimientos, gastos fijos y metas de esta cuenta. Tus cuentas personales siguen siendo privadas.</p>`;
   openSheet({title:'Invitar a la cuenta',body});
-  $('#sh-copy').onclick=()=>{navigator.clipboard?.writeText(a.code).then(()=>toast('Código copiado'),()=>{const r=document.createRange();r.selectNodeContents($('#sh-code'));getSelection().removeAllRanges();getSelection().addRange(r);toast('Seleccionado: copialo con Ctrl/Cmd+C')})};
+  $('#sh-copy').onclick=()=>{navigator.clipboard?.writeText(a.code).then(()=>toast('Código copiado','ok'),()=>{const r=document.createRange();r.selectNodeContents($('#sh-code'));getSelection().removeAllRanges();getSelection().addRange(r);toast('Seleccionado: copialo con Ctrl/Cmd+C')})};
 }
 function openJoinSheet(){
   if(ME.mode!=='db'){toast('Para unirte a una cuenta '+needLogin());return}
@@ -1683,7 +1772,7 @@ const ACT={
   cardsDetail:d=>openCardsDetail(d.id||null),
   payCard:d=>openPayCard(d.id,d.m||UI.month),
   newCuota:d=>openMovSheet(null,{kind:'variable',cuotas:true,card:d.id||''}),
-  paid:async(d,btn)=>{const a=S.accounts[d.acc];const m=a?.movs[d.id];if(!m)return;const M=d.month||UI.month;const p=new Set(m.paid||[]);p.has(M)?p.delete(M):p.add(M);btn.setAttribute('aria-pressed',p.has(M));await write(()=>B.putMov(a,{...m,paid:[...p]}),p.has(M)?'Marcado como pagado':null)},
+  paid:async(d,btn)=>{const a=S.accounts[d.acc];const m=a?.movs[d.id];if(!m)return;const M=d.month||UI.month;const p=new Set(m.paid||[]);p.has(M)?p.delete(M):p.add(M);btn.setAttribute('aria-pressed',p.has(M));if(p.has(M)){haptic();if(!RM()){POP={sel:`.check[data-acc="${d.acc}"][data-id="${d.id}"]`,t:performance.now()};replayPop()}}await write(()=>B.putMov(a,{...m,paid:[...p]}),p.has(M)?'Marcado como pagado':null)},
   currency:()=>openCurrencySheet(),
   notifs:()=>openNotifSheet(),
   newGoal:()=>openGoalSheet(null),
@@ -1781,14 +1870,14 @@ function openNewPasswordSheet(recovery){
     onSave:async()=>{const a=$('#pw1').value,b=$('#pw2').value;
       if(a.length<6){shake($('#pw1').closest('.row'));toast('Mínimo 6 caracteres');return false}
       if(a!==b){shake($('#pw2').closest('.row'));toast('Las contraseñas no coinciden');return false}
-      try{await BK.auth.changePassword(a);toast('Contraseña actualizada');pwSheetOpen=false;return true}catch(e){console.error(e);toast(authErr(e));return false}}});
+      try{await BK.auth.changePassword(a);toast('Contraseña actualizada','ok');pwSheetOpen=false;return true}catch(e){console.error(e);toast(authErr(e));return false}}});
   const r=$('#sheet-root');new MutationObserver((_,o)=>{if(r.hidden||!r.classList.contains('open')){pwSheetOpen=false;o.disconnect()}}).observe(r,{attributes:true});
 }
 function openNameSheet(){
   openSheet({title:'Tu nombre',body:`<div class="group"><label class="row"><span>Nombre</span><input id="nm" maxlength="40" value="${esc(myName())}" data-autofocus></label></div>
     <div class="hint">Es el nombre que ven las personas con las que compartís cuentas.</div>`,
     onSave:async()=>{const n=$('#nm').value.trim();if(!n){shake($('#nm').closest('.row'));return false}
-      try{await BK.auth.saveName(n);delete PROF[ME.uid];toast('Nombre actualizado');schedule();return true}catch(e){console.error(e);toast('No se pudo guardar');return false}}});
+      try{await BK.auth.saveName(n);delete PROF[ME.uid];toast('Nombre actualizado','ok');schedule();return true}catch(e){console.error(e);toast('No se pudo guardar');return false}}});
 }
 const myName=()=>BK&&BK.auth?(BK.auth.name||BK.auth.email.split('@')[0]):'';
 
@@ -1850,7 +1939,7 @@ async function checkUpdate(){
   if(UPD.waiting)applyUpdate();else{toast('Ya tenés la última versión');schedule()}
 }
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();UPD.installEvt=e;schedule()});
-window.addEventListener('appinstalled',()=>{UPD.installEvt=null;toast('¡Chanchito quedó instalada!');schedule()});
+window.addEventListener('appinstalled',()=>{UPD.installEvt=null;toast('¡Chanchito quedó instalada!','ok');schedule()});
 async function doInstall(){const e=UPD.installEvt;if(!e)return;UPD.installEvt=null;e.prompt();try{await e.userChoice}catch(_){}schedule()}
 
 function viewConfig(){
@@ -1908,7 +1997,7 @@ function exportBackup(){
   for(const a of accs())out.accounts[a.id]={name:a.name,color:a.color,created:a.created,scope:a.scope,movs:a.movs,metas:a.metas};
   const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
   const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download=`chanchito-respaldo-${TODAY_S}.json`;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
-  toast('Respaldo descargado');
+  toast('Respaldo descargado','ok');
 }
 function pickBackup(){const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=()=>{if(i.files[0])importBackup(i.files[0])};i.click()}
 async function importBackup(file){
@@ -1927,7 +2016,7 @@ async function importBackup(file){
       for(const[mid,m]of Object.entries(a.movs||{})){await B.putMov(t,{...m,id:mid,by:ME.uid||null});nM++}
     }
   });
-  if(ok){toast(`Listo: se importaron ${nM} movimientos${nA?' en '+nA+(nA===1?' cuenta':' cuentas'):''}`);UI.acc='all';schedule()}
+  if(ok){toast(`Listo: se importaron ${nM} movimientos${nA?' en '+nA+(nA===1?' cuenta':' cuentas'):''}`,'ok');UI.acc='all';schedule()}
 }
 
 /* Importar planilla: Excel (.xlsx) o CSV.
@@ -2149,7 +2238,7 @@ function openSheetImport(fname,an){
       for(const[X,v]of Object.entries(pays)){const d=cardDue(c,X)||X+'-'+pad(daysIn(X));
         await B.putMov(a,{kind:'variable',amount:round2(v),cur:cur(),fx:null,notif:null,desc:'Pago tarjeta '+cardName(c),cat:'tarjeta',catName:'Tarjeta',date:d,due:null,month:d.slice(0,7),rec:false,goal:null,end:null,skip:[],paid:[],card:c.id,cardM:X,by:ME.uid||null,created:now,id:'imp-pay-'+impHash(fname+'|'+c.id+'|'+X)})}
     });
-    if(ok){toast(`Listo: se importaron ${pl(ms.length,'movimiento','movimientos')}`);UI.acc=a.id;store('cc-acc',UI.acc);UI.month=months.includes(NOW_M)?NOW_M:months.at(-1);schedule()}
+    if(ok){toast(`Listo: se importaron ${pl(ms.length,'movimiento','movimientos')}`,'ok');UI.acc=a.id;store('cc-acc',UI.acc);UI.month=months.includes(NOW_M)?NOW_M:months.at(-1);schedule()}
     return ok}});
   const sw=$('#imp-pay');if(sw)sw.onchange=()=>{st.skipPay=sw.checked;refresh()};
   const sel=$('#imp-acc');if(sel)sel.onchange=refresh;
@@ -2164,7 +2253,7 @@ function downloadSheetTemplate(){
     [TODAY_S.split('-').reverse().join('/'),'Gasto','Hogar','','Heladera en cuotas','600000','6']];
   const csv='﻿'+rows.map(r=>r.map(v=>/[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v).join(';')).join('\r\n');
   const u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const l=document.createElement('a');l.href=u;l.download='chanchito-planilla-modelo.csv';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);
-  toast('Planilla modelo descargada');
+  toast('Planilla modelo descargada','ok');
 }
 
 initSW();
